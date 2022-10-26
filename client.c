@@ -13,7 +13,10 @@ int main(int argc, char *argv[]) {
     long port;
 
     if (argc == 4) {
-        if (strlen(argv[1]) > UNIX_PATH_MAX)
+        if (strlen(argv[1]) > UNIX_PATH_MAX) {
+            printf("Hostname must be less than 32 bytes long.");
+            goto exit;
+        }
         hostname = malloc(strlen(argv[1]) + 1);
         strcpy(hostname, argv[1]);
 
@@ -25,15 +28,13 @@ int main(int argc, char *argv[]) {
             goto exit;
         }
         username = malloc(strlen(argv[3]) + 1);
-        strcpy(hostname, argv[3]);
+        strcpy(username, argv[3]);
     }
     else {
         printf("Usage: ./client server_socket server_port username\n");
         goto exit;
     }
-
-
-    //printf("%s", username);
+    
     // connect to server
 
     // listen stdin for chat and commands
