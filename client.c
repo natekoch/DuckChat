@@ -1,6 +1,5 @@
 #include "duckchat.h"
 #include <netinet/in.h>
-#include <sys/_endian.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -12,7 +11,7 @@
 int main(int argc, char *argv[]) {
     
     char *HOSTNAME, *USERNAME;
-    long PORT;
+    int PORT;
 
     if (argc == 4) {
         if (strlen(argv[1]) > UNIX_PATH_MAX) {
@@ -22,7 +21,7 @@ int main(int argc, char *argv[]) {
         HOSTNAME = malloc(strlen(argv[1]) + 1);
         strcpy(HOSTNAME, argv[1]);
 
-        PORT = atol(argv[2]);
+        PORT = atoi(argv[2]);
 
         if (strlen(argv[3])  > USERNAME_MAX) {
             // TODO: Figure out the expected client response from test binaries
@@ -42,26 +41,39 @@ int main(int argc, char *argv[]) {
     // connect to server
     int sockfd = 0;
     struct sockaddr_in server_addr;
-    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         printf("Error: could not create socket.\n");
         goto exit;
     }
 
-    server_addr.sin_family = AF_UNIX;
-    server_addr.sin_port = htonl(PORT);
-    server_addr.sin_addr.s_addr = inet_addr(HOSTNAME);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // TODO: fix to have custom HOSTNAME
     
     if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         printf("Error: could not connect to server.\n");
         goto exit;
     }
 
-    struct request_login *login;
-    login->req_type = REQ_LOGIN;
-    strcpy(login->req_username, USERNAME);
+    // login
+    struct request_login login;// = malloc(sizeof(struct request_login));
+    login.req_type = REQ_LOGIN;
+    strcpy(login.req_username, USERNAME);
 
-    send(sockfd, login, sizeof(*login), 0);
+    send(sockfd, &login, sizeof(login), 0);
+    
+    // join common
+    struct request_join join_init;
+    join_init.req_type = REQ_JOIN;
+    strcpy(join_init.req_channel, "Common");
 
+    send(sockfd, &join_init, sizeof(join_init), 0);
+
+
+
+    printf("%ld\n", sizeof(login));
+    printf("%s\n", login.req_username);
+    //free(login);
     // listen stdin for chat and commands
 
     // print out any responses from server
