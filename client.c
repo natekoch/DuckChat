@@ -164,7 +164,28 @@ int main(int argc, char *argv[]) {
 
         struct text recv_text;
         recv(sockfd, &recv_text, 1024, 0);
-        printf("%d", recv_text.txt_type);
+        //printf("%s\n", recv_text);
+        printf("%d\n", recv_text.txt_type);
+
+        struct text_say *say_text = (struct text_say*) &recv_text;
+        printf("%d\n", say_text->txt_channel);
+        
+        /*
+        if (recv_text.txt_type == TXT_SAY) {
+            //struct text_say* say_text = (struct text_say*) &recv_text;
+            //printf("[%s][%s]: %s\n",  (char *) ntohs(say_text->txt_channel), 
+                                           // (char *) ntohs(say_text->txt_username), 
+                                           // (char *) ntohs(say_text->txt_text)); 
+        } else if (recv_text.txt_type == TXT_LIST) {
+            
+        } else if (recv_text.txt_type == TXT_WHO) {
+
+        } else if (recv_text.txt_type == TXT_ERROR) {
+
+        } else {
+            printf("Unknown message sent from the server.\n");
+        }
+        */
     }
     
     // print out any responses from server
