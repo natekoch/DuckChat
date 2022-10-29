@@ -93,9 +93,66 @@ int main(int argc, char *argv[]) {
         //printf("%s\n", input_buf);
 
         if (input_buf[0] == '/') { // parse command
-            printf("command detected\n");
+            char command[7];
+            char channel[CHANNEL_MAX];
+            sscanf(input_buf, "%7s %32s", command, channel);
+            if (strncmp(command, "/exit", 5) == 0) { 
+                // logout of server
+                struct request_logout logout;
+                logout.req_type = REQ_LOGOUT;
 
-            //printf("*Unknown command\n");
+                send(sockfd, &logout, sizeof(logout), 0);
+
+                goto exit;
+
+            } else if (strncmp(command, "/join", 5) == 0) {
+                if (input_buf[5] == ' ') {
+                    // join channel
+                    struct request_join join;
+                    join.req_type = REQ_JOIN;
+                    strcpy(join.req_channel, channel);
+                    
+                    send(sockfd, &join, sizeof(join), 0);
+
+                    // TODO: update user channels list
+                } else printf("Invalid usage: /join channel\n");
+            } else if (strncmp(command, "/leave", 6) == 0) {
+                if (input_buf[6] == ' ') {
+                    // leave channel 
+                    struct request_leave leave;
+                    leave.req_type = REQ_LEAVE;
+                    strcpy(leave.req_channel, channel);
+
+                    send(sockfd, &leave, sizeof(leave), 0);
+
+                    // TODO: update user channels list
+                } else printf("Invalid usage: /leave channel\n");
+            } else if (strncmp(command, "/list", 5) == 0) {
+                // list channels
+                struct request_list list;
+                list.req_type = REQ_LIST;
+
+                send(sockfd, &list, sizeof(list), 0);
+            } else if (strncmp(command, "/who", 4) == 0) {
+                if (input_buf[4] == ' ') {    
+                    // list users in channel
+                    struct request_who who;
+                    who.req_type = REQ_WHO;
+                    strcpy(who.req_channel, channel);
+
+                    send(sockfd, &who, sizeof(who), 0);
+                } else printf("Invalid usage: /who channel\n"); 
+            } else if (strncmp(command, "/switch", 7) == 0) {
+                if (input_buf[7] == ' ') {
+                    printf("s\n");
+                    // TODO: switch to channel
+                    // need to keep list of channels 
+                    // give error if not in a channel
+                    // change current_channel variable
+                } else printf("Invalid usage: /switch channel\n");
+            } else {
+                printf("*Unknown command\n");
+            }
         } else { // send say message
             struct request_say msg;
             msg.req_type = REQ_SAY;
@@ -108,14 +165,7 @@ int main(int argc, char *argv[]) {
     
     // print out any responses from server
 
-    
-    
-
-   // printf("%d %s", login->req_type, login->req_username);
-
 exit:
-    //if (HOSTNAME != NULL) free(HOSTNAME);
-    //if (USERNAME != NULL) free(USERNAME);
     cooked_mode();
     exit(EXIT_SUCCESS);
 
