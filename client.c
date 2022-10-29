@@ -161,6 +161,10 @@ int main(int argc, char *argv[]) {
 
             send(sockfd, &msg, sizeof(msg), 0);
         }
+
+        struct text recv_text;
+        recv(sockfd, &recv_text, 1024, 0);
+        printf("%d", recv_text.txt_type);
     }
     
     // print out any responses from server
