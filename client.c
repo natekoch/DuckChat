@@ -9,12 +9,23 @@
 #include <errno.h>
 #include <string.h>
 
+static int manage_channels(char *channel, char flag);
+
+
+char current_channel[CHANNEL_MAX];
+char channels[20][CHANNEL_MAX];
+
+static void init_channels() {
+    for (int i = 0; i < 20; i++) {
+        strcpy(channels[i], "");
+    }
+}
+
 int main(int argc, char *argv[]) {
     
     char HOSTNAME[UNIX_PATH_MAX]; 
     char USERNAME[USERNAME_MAX];
     int PORT;
-    char current_channel[CHANNEL_MAX];
 
     if (argc == 4) {
         if (strlen(argv[1]) > UNIX_PATH_MAX) {
@@ -26,7 +37,6 @@ int main(int argc, char *argv[]) {
         PORT = atoi(argv[2]);
 
         if (strlen(argv[3]) > USERNAME_MAX) {
-            // TODO: Figure out the expected client response from test binaries
             printf("Username must be less than 32 bytes long.");
             goto exit;
         }
@@ -61,6 +71,8 @@ int main(int argc, char *argv[]) {
 
     send(sockfd, &login, sizeof(login), 0);
     
+    init_channels();
+
     // join common
     strcpy(current_channel, "Common");
 
@@ -69,6 +81,8 @@ int main(int argc, char *argv[]) {
     strcpy(join_init.req_channel, current_channel);
 
     send(sockfd, &join_init, sizeof(join_init), 0);
+
+    strcpy(channels[0], current_channel);
 
     fd_set readfds;
 
@@ -118,24 +132,30 @@ int main(int argc, char *argv[]) {
                 } else if (strncmp(command, "/join", 5) == 0) {
                     if (input_buf[5] == ' ') {
                         // join channel
-                        struct request_join join;
-                        join.req_type = REQ_JOIN;
-                        strcpy(join.req_channel, channel);
-                        
-                        send(sockfd, &join, sizeof(join), 0);
-
-                        // TODO: update user channels list
+                        if (manage_channels(channel, 'a') == 1) {
+                            struct request_join join;
+                            join.req_type = REQ_JOIN;
+                            strcpy(join.req_channel, channel);
+                            
+                            send(sockfd, &join, sizeof(join), 0);
+                        } else {
+                            printf("Already joined the maximum number of channels 20.\nPlease leave one before joining another.\n");
+                            continue;
+                        }
                     } else printf("Invalid usage: /join channel\n");
                 } else if (strncmp(command, "/leave", 6) == 0) {
                     if (input_buf[6] == ' ') {
                         // leave channel 
-                        struct request_leave leave;
-                        leave.req_type = REQ_LEAVE;
-                        strcpy(leave.req_channel, channel);
+                        if (manage_channels(channel, 'r') == 1) {
+                            struct request_leave leave;
+                            leave.req_type = REQ_LEAVE;
+                            strcpy(leave.req_channel, channel);
 
-                        send(sockfd, &leave, sizeof(leave), 0);
-
-                        // TODO: update user channels list
+                            send(sockfd, &leave, sizeof(leave), 0);
+                        } else {
+                            printf("Error: can't leave a channel not subscribed to: %s", channel);
+                            continue;
+                        }
                     } else printf("Invalid usage: /leave channel\n");
                 } else if (strncmp(command, "/list", 5) == 0) {
                     // list channels
@@ -154,15 +174,15 @@ int main(int argc, char *argv[]) {
                     } else printf("Invalid usage: /who channel\n"); 
                 } else if (strncmp(command, "/switch", 7) == 0) {
                     if (input_buf[7] == ' ') {
-                        printf("s\n");
-                        // TODO: switch to channel
-                        // need to keep list of channels 
-                        // give error if not in a channel
-                        // change current_channel variable
+                        if (manage_channels(channel, 's') == 0) {
+                            printf("Error: not subscribed to %s", channel);
+                        }
                     } else printf("Invalid usage: /switch channel\n");
                 } else {
                     printf("*Unknown command\n");
                 }
+                strcpy(channel, "");
+                strcpy(command, "");
             } else { // send say message
                 struct request_say msg;
                 msg.req_type = REQ_SAY;
@@ -219,4 +239,39 @@ int main(int argc, char *argv[]) {
 exit:
     cooked_mode();
     exit(EXIT_SUCCESS);
+}
+
+
+static int manage_channels(char *channel, char flag) {
+    int ret = 0;
+    switch (flag) {
+        case 'a':
+            for (int i = 0; i < 20; i++) {
+                if (strcmp(channels[i], "") == 0) {
+                    strcpy(channels[i], channel);   
+                    ret = 1;
+                    break;
+                }
+            } 
+            break;
+        case 's':   
+            for (int i = 0; i < 20; i++) {
+                if (strcmp(channels[i], channel) == 0) {
+                    strcpy(current_channel, channel);
+                    ret = 1;   
+                    break;
+                }
+            }
+            break;
+        case 'r':
+            for (int i = 0; i < 20; i++) {
+                if (strcmp(channels[i], channel) == 0) {
+                    strcpy(channels[i], "");   
+                    ret = 1;
+                    break;
+                }
+            }
+            break;
+    }
+    return ret;
 }
