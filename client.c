@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     // listen stdin for chat and commands
     while (1) {
         char input_buf[SAY_MAX];
-        char c;
+        char c = '\0';
         printf(">");
         raw_mode();
         int i = 0;
@@ -162,14 +162,36 @@ int main(int argc, char *argv[]) {
             send(sockfd, &msg, sizeof(msg), 0);
         }
 
-        struct text recv_text;
-        recv(sockfd, &recv_text, 1024, 0);
-        //printf("%s\n", recv_text);
-        printf("%d\n", recv_text.txt_type);
+        strcpy(input_buf, "");
 
-        struct text_say *say_text = (struct text_say*) &recv_text;
-        printf("%d\n", say_text->txt_channel);
+        char recv_buf[1024];
+        memset(recv_buf, 0, sizeof(recv_buf));
+        struct text *recv_text;
+
+        recv(sockfd, recv_buf, 1024, 0);
         
+        recv_text = (struct text *) recv_buf;
+
+        struct text_say *say_text = (struct text_say *) recv_text;
+
+        printf("[%s][%s]: %s\n",    say_text->txt_channel,
+                                    say_text->txt_username,
+                                    say_text->txt_text);
+        /*
+        for (int i = 0; i < 80; i++) {
+            printf("\b");
+        }
+        
+        printf("%d\n", recv_text->txt_type);
+
+        struct text_say *say_text; 
+        
+        printf("%s\n", say_text->txt_channel);
+
+        //printf("%s", recv_text.txt_channel);
+        //x = ntohl(x);
+        //printf("%d\n", x)
+        */
         /*
         if (recv_text.txt_type == TXT_SAY) {
             //struct text_say* say_text = (struct text_say*) &recv_text;
