@@ -21,7 +21,6 @@ int main(int argc, char *argv[]) {
             printf("Hostname must be less than 32 bytes long.");
             goto exit;
         }
-        //HOSTNAME = malloc(strlen(argv[1]) + 1);
         strcpy(HOSTNAME, argv[1]);
 
         PORT = atoi(argv[2]);
@@ -31,7 +30,6 @@ int main(int argc, char *argv[]) {
             printf("Username must be less than 32 bytes long.");
             goto exit;
         }
-        //USERNAME = malloc(strlen(argv[3]) + 1);
         strcpy(USERNAME, argv[3]);
     }
     else {
@@ -51,13 +49,13 @@ int main(int argc, char *argv[]) {
     server_addr.sin_port = htons(PORT);
     server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // TODO: fix to have custom HOSTNAME
     
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
         printf("Error: could not connect to server.\n");
         goto exit;
     }
     
     // login
-    struct request_login login;// = malloc(sizeof(struct request_login));
+    struct request_login login;
     login.req_type = REQ_LOGIN;
     strcpy(login.req_username, USERNAME);
 
@@ -90,7 +88,6 @@ int main(int argc, char *argv[]) {
             i++;
         }
         printf("\n");
-        //printf("%s\n", input_buf);
 
         if (input_buf[0] == '/') { // parse command
             char command[7];
@@ -171,43 +168,37 @@ int main(int argc, char *argv[]) {
         recv(sockfd, recv_buf, 1024, 0);
         
         recv_text = (struct text *) recv_buf;
-
-        struct text_say *say_text = (struct text_say *) recv_text;
-
-        printf("[%s][%s]: %s\n",    say_text->txt_channel,
-                                    say_text->txt_username,
-                                    say_text->txt_text);
-        /*
-        for (int i = 0; i < 80; i++) {
+        
+        // TODO: clear stdin
+        for (int i = 0; i < SAY_MAX; i++) {
             printf("\b");
         }
-        
-        printf("%d\n", recv_text->txt_type);
 
-        struct text_say *say_text; 
-        
-        printf("%s\n", say_text->txt_channel);
+        if (recv_text->txt_type == TXT_SAY) {
+            struct text_say *say_text = (struct text_say *) recv_text;
 
-        //printf("%s", recv_text.txt_channel);
-        //x = ntohl(x);
-        //printf("%d\n", x)
-        */
-        /*
-        if (recv_text.txt_type == TXT_SAY) {
-            //struct text_say* say_text = (struct text_say*) &recv_text;
-            //printf("[%s][%s]: %s\n",  (char *) ntohs(say_text->txt_channel), 
-                                           // (char *) ntohs(say_text->txt_username), 
-                                           // (char *) ntohs(say_text->txt_text)); 
-        } else if (recv_text.txt_type == TXT_LIST) {
-            
-        } else if (recv_text.txt_type == TXT_WHO) {
-
-        } else if (recv_text.txt_type == TXT_ERROR) {
-
+            printf("[%s][%s]: %s\n",    say_text->txt_channel,
+                                        say_text->txt_username,
+                                        say_text->txt_text);
+        } else if (recv_text->txt_type == TXT_LIST) {
+            struct text_list *list_text = (struct text_list *) recv_text;
+            printf("\nExisting channels:\n");
+            for (int i = 0; i < list_text->txt_nchannels; i++) {
+                printf("\t%s\n", list_text->txt_channels[i].ch_channel);
+            }
+        } else if (recv_text->txt_type == TXT_WHO) {
+            struct text_who *who_text = (struct text_who *) recv_text;
+            printf("Users on channel %s:\n", who_text->txt_channel);
+            for (int i = 0; i < who_text->txt_nusernames; i++) {
+                printf("%s\n", who_text->txt_users[i].us_username);
+            }
+        } else if (recv_text->txt_type == TXT_ERROR) {
+            struct text_error *error_text = (struct text_error *) recv_text;
+            printf("%s\n", error_text->txt_error);
         } else {
             printf("Unknown message sent from the server.\n");
         }
-        */
+        
     }
     
     // print out any responses from server
@@ -215,5 +206,4 @@ int main(int argc, char *argv[]) {
 exit:
     cooked_mode();
     exit(EXIT_SUCCESS);
-
 }
