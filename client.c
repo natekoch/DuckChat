@@ -72,8 +72,12 @@ int main(int argc, char *argv[]) {
 
     fd_set readfds;
 
+    raw_mode();
+
     // listen stdin for chat and commands
     while (1) {
+        fprintf(stdout, ">");
+        fflush(stdout);
 
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
@@ -84,8 +88,7 @@ int main(int argc, char *argv[]) {
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
             char input_buf[SAY_MAX];
             char c = '\0';
-            printf(">");
-            raw_mode();
+            //printf(">");
             int i = 0;
             while (1) {
                 c = fgetc(stdin);
@@ -168,7 +171,6 @@ int main(int argc, char *argv[]) {
 
                 send(sockfd, &msg, sizeof(msg), 0);
             }
-
             strcpy(input_buf, "");
 
         } else if (FD_ISSET(sockfd, &readfds)) {
