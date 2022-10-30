@@ -88,10 +88,16 @@ int main(int argc, char *argv[]) {
 
     raw_mode();
 
+    char input_buf[SAY_MAX];
+    strcpy(input_buf, "");
+    int len = 0;
+
+    char c = '\0';
+
+    putchar('>');
+    fflush(stdout);
     // listen stdin for chat and commands
     while (1) {
-        fprintf(stdout, ">");
-        fflush(stdout);
 
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
@@ -99,22 +105,24 @@ int main(int argc, char *argv[]) {
 
         select((sockfd + 1), &readfds, NULL, NULL, NULL);
 
+        //char input_buf[SAY_MAX];
+
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
-            char input_buf[SAY_MAX];
-            char c = '\0';
-            //printf(">");
-            int i = 0;
-            while (1) {
-                c = fgetc(stdin);
-                if (c == '\n') break;
-                if (i < SAY_MAX) {
-                    input_buf[i] = c;
-                    printf("%c", c);
+            //char input_buf[SAY_MAX];
+            //char c = '\0';
+            c = getchar();
+            if (c != '\n') { 
+                if (len < SAY_MAX) {
+                    input_buf[len++] = c;
+                    putchar(c);
                 }
-                input_buf[i+1] = '\0';
-                i++;
+                fflush(stdout);
+                continue;
             }
-            printf("\n");
+
+            input_buf[len] = '\0';
+            len = 0;
+            putchar('\n');
 
             if (input_buf[0] == '/') { // parse command
                 char command[7];
@@ -139,7 +147,8 @@ int main(int argc, char *argv[]) {
                             
                             send(sockfd, &join, sizeof(join), 0);
                         } else {
-                            printf("Already joined the maximum number of channels 20.\nPlease leave one before joining another.\n");
+                            printf("Already joined the maximum number of channels 20\n");
+                            printf("Please leave one before joining another.\n");
                             continue;
                         }
                     } else printf("Invalid usage: /join channel\n");
@@ -193,6 +202,8 @@ int main(int argc, char *argv[]) {
             }
             strcpy(input_buf, "");
 
+            putchar('>');
+            fflush(stdout);
         } else if (FD_ISSET(sockfd, &readfds)) {
             char recv_buf[1024];
             memset(recv_buf, 0, sizeof(recv_buf));
@@ -202,9 +213,9 @@ int main(int argc, char *argv[]) {
             
             recv_text = (struct text *) recv_buf;
             
-            // TODO: clear stdin
+            // clear terminal line 
             for (int i = 0; i < SAY_MAX; i++) {
-                printf("\b");
+                printf("\b \b");
             }
 
             if (recv_text->txt_type == TXT_SAY) {
@@ -223,7 +234,7 @@ int main(int argc, char *argv[]) {
                 struct text_who *who_text = (struct text_who *) recv_text;
                 printf("Users on channel %s:\n", who_text->txt_channel);
                 for (int i = 0; i < who_text->txt_nusernames; i++) {
-                    printf("%s\n", who_text->txt_users[i].us_username);
+                    printf("\t%s\n", who_text->txt_users[i].us_username);
                 }
             } else if (recv_text->txt_type == TXT_ERROR) {
                 struct text_error *error_text = (struct text_error *) recv_text;
@@ -231,11 +242,15 @@ int main(int argc, char *argv[]) {
             } else {
                 printf("Unknown message sent from the server.\n");
             }
+            putchar('>');
+            fflush(stdout);
+            for (int i = 0; i < len; i++) {
+                putchar(input_buf[i]);
+            }
+            fflush(stdout);
         }
     }
     
-    // print out any responses from server
-
 exit:
     cooked_mode();
     exit(EXIT_SUCCESS);
@@ -248,7 +263,8 @@ static int manage_channels(char *channel, char flag) {
         case 'a':
             for (int i = 0; i < 20; i++) {
                 if (strcmp(channels[i], "") == 0) {
-                    strcpy(channels[i], channel);   
+                    strcpy(channels[i], channel); // subscribe to channel
+                    strcpy(current_channel, channel); // change to channel
                     ret = 1;
                     break;
                 }
