@@ -70,135 +70,146 @@ int main(int argc, char *argv[]) {
 
     send(sockfd, &join_init, sizeof(join_init), 0);
 
+    fd_set readfds;
+
     // listen stdin for chat and commands
     while (1) {
-        char input_buf[SAY_MAX];
-        char c = '\0';
-        printf(">");
-        raw_mode();
-        int i = 0;
-        while (1) {
-            c = fgetc(stdin);
-            if (c == '\n') break;
-            if (i < SAY_MAX) {
-                input_buf[i] = c;
-                printf("%c", c);
+
+        FD_ZERO(&readfds);
+        FD_SET(sockfd, &readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+
+        select((sockfd + 1), &readfds, NULL, NULL, NULL);
+
+        if (FD_ISSET(STDIN_FILENO, &readfds)) {
+            char input_buf[SAY_MAX];
+            char c = '\0';
+            printf(">");
+            raw_mode();
+            int i = 0;
+            while (1) {
+                c = fgetc(stdin);
+                if (c == '\n') break;
+                if (i < SAY_MAX) {
+                    input_buf[i] = c;
+                    printf("%c", c);
+                }
+                input_buf[i+1] = '\0';
+                i++;
             }
-            input_buf[i+1] = '\0';
-            i++;
-        }
-        printf("\n");
+            printf("\n");
 
-        if (input_buf[0] == '/') { // parse command
-            char command[7];
-            char channel[CHANNEL_MAX];
-            sscanf(input_buf, "%7s %32s", command, channel);
-            if (strncmp(command, "/exit", 5) == 0) { 
-                // logout of server
-                struct request_logout logout;
-                logout.req_type = REQ_LOGOUT;
+            if (input_buf[0] == '/') { // parse command
+                char command[7];
+                char channel[CHANNEL_MAX];
+                sscanf(input_buf, "%7s %32s", command, channel);
+                if (strncmp(command, "/exit", 5) == 0) { 
+                    // logout of server
+                    struct request_logout logout;
+                    logout.req_type = REQ_LOGOUT;
 
-                send(sockfd, &logout, sizeof(logout), 0);
+                    send(sockfd, &logout, sizeof(logout), 0);
 
-                goto exit;
+                    goto exit;
 
-            } else if (strncmp(command, "/join", 5) == 0) {
-                if (input_buf[5] == ' ') {
-                    // join channel
-                    struct request_join join;
-                    join.req_type = REQ_JOIN;
-                    strcpy(join.req_channel, channel);
-                    
-                    send(sockfd, &join, sizeof(join), 0);
+                } else if (strncmp(command, "/join", 5) == 0) {
+                    if (input_buf[5] == ' ') {
+                        // join channel
+                        struct request_join join;
+                        join.req_type = REQ_JOIN;
+                        strcpy(join.req_channel, channel);
+                        
+                        send(sockfd, &join, sizeof(join), 0);
 
-                    // TODO: update user channels list
-                } else printf("Invalid usage: /join channel\n");
-            } else if (strncmp(command, "/leave", 6) == 0) {
-                if (input_buf[6] == ' ') {
-                    // leave channel 
-                    struct request_leave leave;
-                    leave.req_type = REQ_LEAVE;
-                    strcpy(leave.req_channel, channel);
+                        // TODO: update user channels list
+                    } else printf("Invalid usage: /join channel\n");
+                } else if (strncmp(command, "/leave", 6) == 0) {
+                    if (input_buf[6] == ' ') {
+                        // leave channel 
+                        struct request_leave leave;
+                        leave.req_type = REQ_LEAVE;
+                        strcpy(leave.req_channel, channel);
 
-                    send(sockfd, &leave, sizeof(leave), 0);
+                        send(sockfd, &leave, sizeof(leave), 0);
 
-                    // TODO: update user channels list
-                } else printf("Invalid usage: /leave channel\n");
-            } else if (strncmp(command, "/list", 5) == 0) {
-                // list channels
-                struct request_list list;
-                list.req_type = REQ_LIST;
+                        // TODO: update user channels list
+                    } else printf("Invalid usage: /leave channel\n");
+                } else if (strncmp(command, "/list", 5) == 0) {
+                    // list channels
+                    struct request_list list;
+                    list.req_type = REQ_LIST;
 
-                send(sockfd, &list, sizeof(list), 0);
-            } else if (strncmp(command, "/who", 4) == 0) {
-                if (input_buf[4] == ' ') {    
-                    // list users in channel
-                    struct request_who who;
-                    who.req_type = REQ_WHO;
-                    strcpy(who.req_channel, channel);
+                    send(sockfd, &list, sizeof(list), 0);
+                } else if (strncmp(command, "/who", 4) == 0) {
+                    if (input_buf[4] == ' ') {    
+                        // list users in channel
+                        struct request_who who;
+                        who.req_type = REQ_WHO;
+                        strcpy(who.req_channel, channel);
 
-                    send(sockfd, &who, sizeof(who), 0);
-                } else printf("Invalid usage: /who channel\n"); 
-            } else if (strncmp(command, "/switch", 7) == 0) {
-                if (input_buf[7] == ' ') {
-                    printf("s\n");
-                    // TODO: switch to channel
-                    // need to keep list of channels 
-                    // give error if not in a channel
-                    // change current_channel variable
-                } else printf("Invalid usage: /switch channel\n");
+                        send(sockfd, &who, sizeof(who), 0);
+                    } else printf("Invalid usage: /who channel\n"); 
+                } else if (strncmp(command, "/switch", 7) == 0) {
+                    if (input_buf[7] == ' ') {
+                        printf("s\n");
+                        // TODO: switch to channel
+                        // need to keep list of channels 
+                        // give error if not in a channel
+                        // change current_channel variable
+                    } else printf("Invalid usage: /switch channel\n");
+                } else {
+                    printf("*Unknown command\n");
+                }
+            } else { // send say message
+                struct request_say msg;
+                msg.req_type = REQ_SAY;
+                strcpy(msg.req_channel, current_channel);
+                strcpy(msg.req_text, input_buf);
+
+                send(sockfd, &msg, sizeof(msg), 0);
+            }
+
+            strcpy(input_buf, "");
+
+        } else if (FD_ISSET(sockfd, &readfds)) {
+            char recv_buf[1024];
+            memset(recv_buf, 0, sizeof(recv_buf));
+            struct text *recv_text;
+
+            recv(sockfd, recv_buf, 1024, 0);
+            
+            recv_text = (struct text *) recv_buf;
+            
+            // TODO: clear stdin
+            for (int i = 0; i < SAY_MAX; i++) {
+                printf("\b");
+            }
+
+            if (recv_text->txt_type == TXT_SAY) {
+                struct text_say *say_text = (struct text_say *) recv_text;
+
+                printf("[%s][%s]: %s\n",    say_text->txt_channel,
+                                            say_text->txt_username,
+                                            say_text->txt_text);
+            } else if (recv_text->txt_type == TXT_LIST) {
+                struct text_list *list_text = (struct text_list *) recv_text;
+                printf("Existing channels:\n");
+                for (int i = 0; i < list_text->txt_nchannels; i++) {
+                    printf("\t%s\n", list_text->txt_channels[i].ch_channel);
+                }
+            } else if (recv_text->txt_type == TXT_WHO) {
+                struct text_who *who_text = (struct text_who *) recv_text;
+                printf("Users on channel %s:\n", who_text->txt_channel);
+                for (int i = 0; i < who_text->txt_nusernames; i++) {
+                    printf("%s\n", who_text->txt_users[i].us_username);
+                }
+            } else if (recv_text->txt_type == TXT_ERROR) {
+                struct text_error *error_text = (struct text_error *) recv_text;
+                printf("%s\n", error_text->txt_error);
             } else {
-                printf("*Unknown command\n");
+                printf("Unknown message sent from the server.\n");
             }
-        } else { // send say message
-            struct request_say msg;
-            msg.req_type = REQ_SAY;
-            strcpy(msg.req_channel, current_channel);
-            strcpy(msg.req_text, input_buf);
-
-            send(sockfd, &msg, sizeof(msg), 0);
         }
-
-        strcpy(input_buf, "");
-
-        char recv_buf[1024];
-        memset(recv_buf, 0, sizeof(recv_buf));
-        struct text *recv_text;
-
-        recv(sockfd, recv_buf, 1024, 0);
-        
-        recv_text = (struct text *) recv_buf;
-        
-        // TODO: clear stdin
-        for (int i = 0; i < SAY_MAX; i++) {
-            printf("\b");
-        }
-
-        if (recv_text->txt_type == TXT_SAY) {
-            struct text_say *say_text = (struct text_say *) recv_text;
-
-            printf("[%s][%s]: %s\n",    say_text->txt_channel,
-                                        say_text->txt_username,
-                                        say_text->txt_text);
-        } else if (recv_text->txt_type == TXT_LIST) {
-            struct text_list *list_text = (struct text_list *) recv_text;
-            printf("Existing channels:\n");
-            for (int i = 0; i < list_text->txt_nchannels; i++) {
-                printf("\t%s\n", list_text->txt_channels[i].ch_channel);
-            }
-        } else if (recv_text->txt_type == TXT_WHO) {
-            struct text_who *who_text = (struct text_who *) recv_text;
-            printf("Users on channel %s:\n", who_text->txt_channel);
-            for (int i = 0; i < who_text->txt_nusernames; i++) {
-                printf("%s\n", who_text->txt_users[i].us_username);
-            }
-        } else if (recv_text->txt_type == TXT_ERROR) {
-            struct text_error *error_text = (struct text_error *) recv_text;
-            printf("%s\n", error_text->txt_error);
-        } else {
-            printf("Unknown message sent from the server.\n");
-        }
-        
     }
     
     // print out any responses from server
