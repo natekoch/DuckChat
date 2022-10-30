@@ -126,6 +126,6 @@ struct text_who {
 struct text_error {
         text_t txt_type; /* = TXT_ERROR */
         char txt_error[SAY_MAX]; // Error message
-};
+} packed;
 
 #endif

@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
                                         say_text->txt_text);
         } else if (recv_text->txt_type == TXT_LIST) {
             struct text_list *list_text = (struct text_list *) recv_text;
-            printf("\nExisting channels:\n");
+            printf("Existing channels:\n");
             for (int i = 0; i < list_text->txt_nchannels; i++) {
                 printf("\t%s\n", list_text->txt_channels[i].ch_channel);
             }
