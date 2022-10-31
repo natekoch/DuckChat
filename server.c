@@ -44,10 +44,10 @@ int main(int argc, char *argv[]) {
     struct sockaddr_storage clientaddr;
     socklen_t addrlen;
 
-    char client_buf[1024];
-    int nbytes;
+    //char client_buf[1024];
+    //int nbytes;
 
-    char remoteIP[INET_ADDRSTRLEN];
+    //char remoteIP[INET_ADDRSTRLEN];
 
     int yes=1;
     int rev;
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
-    if ((rev = getaddrinfo(NULL, PORT, &hints, &res)) != 0) {
+    if ((rev = getaddrinfo(NULL, argv[2], &hints, &res)) != 0) {
         printf("Error getting address information.\n");
         goto exit;
     }
