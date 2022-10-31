@@ -14,6 +14,8 @@
 char HOSTNAME[UNIX_PATH_MAX];
 int PORT;
 
+user clients[20];
+
 int main(int argc, char *argv[]) {
 
     // handle initial server input
@@ -41,10 +43,13 @@ int main(int argc, char *argv[]) {
     if ((listener = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         printf("Error: could not create socket.\n");
     }
+
+    struct hostent *host;
+    host = gethostbyname(HOSTNAME); 
     
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    server_addr.sin_addr.s_addr = *(in_addr_t *) host->h_addr_list[0];
     
     if (bind(listener, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         printf("Error: could not bind server and socket.\n");
@@ -80,79 +85,18 @@ int main(int argc, char *argv[]) {
 
         printf("%d\n", recv_packet->txt_type);
     }
-    
-    /*
-    int fdmax;
-
-    struct addrinfo hints, *res, *temp;
-    
-    FD_ZERO(&main_fds);
-    FD_ZERO(&read_fds);
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_PASSIVE;
-    if ((rev = getaddrinfo(NULL, argv[2], &hints, &res)) != 0) {
-        printf("Error getting address information.\n");
-        goto exit;
-    }
-
-    for (temp = res; temp != NULL; temp = temp->ai_next) {
-        listener = socket(temp->ai_family, temp->ai_socktype, temp->ai_protocol);
-        if (listener < 0) {
-            continue;
-        }
-
-        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-
-        if (bind(listener, temp->ai_addr, temp->ai_addrlen) < 0) {
-            close(listener);
-            continue;
-        }
-
-        break;
-    }
-
-    if (temp == NULL) {
-        printf("Failed to bind.");
-        goto exit;
-    }
-
-    freeaddrinfo(res);
-
-    FD_SET(listener, &main_fds);
-
-    fdmax = listener;
-
-    while(1) {
-        read_fds = main_fds;
-        select(fdmax+1, &read_fds, NULL, NULL, NULL);
-
-        for (int i = 0; i <= fdmax; i++) {
-            if (FD_ISSET(i, &read_fds)) {
-                if (i == listener) {
-                    addrlen = sizeof(clientaddr);
-                    latest_fd = accept( listener, 
-                                        (struct sockaddr *)&clientaddr, 
-                                        &addrlen);
-                    if (latest_fd == -1) {
-                        printf("Failed to accept new connection.\n");
-                    } else {
-                        FD_SET(latest_fd, &main_fds);
-                        if (latest_fd > fdmax) {
-                            fdmax = latest_fd;
-                        }
-                        printf("New connection\n");
-                    }
-                } else {
-                    printf("data\n");
-                }
-            }
-        }
-    }
-    */
 
 exit:
     exit(EXIT_SUCCESS);
+}
+
+static int add_user(char *client_domain, char *client_port) {
+    int ret = 0;
+    // TODO: FINISH
+
+    // search for an empty spot in clients
+    // place new user into empty spot ret 1
+    // if no room ret 0 
+
+    return ret;
 }
