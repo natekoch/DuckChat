@@ -9,6 +9,6 @@ typedef struct user {
     char channels[20][CHANNEL_MAX];
 } user;
 
-static int add_user(char *, char *);
+//static int add_user(char *, char *);
 
 #endif

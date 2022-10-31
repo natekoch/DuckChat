@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <netdb.h>
 
 char current_channel[CHANNEL_MAX];
 char channels[20][CHANNEL_MAX];
@@ -23,6 +24,8 @@ char USERNAME[USERNAME_MAX];
 int PORT;
 
 char recv_buf[1024];
+
+int raw = 0;
 
 int main(int argc, char *argv[]) {
     
@@ -72,7 +75,8 @@ int main(int argc, char *argv[]) {
 
     // switch to raw mode for individual character input
     raw_mode();
-
+    raw = 1;
+    
     // input variables
     char input_buf[SAY_MAX];
     strcpy(input_buf, "");
@@ -203,21 +207,25 @@ int main(int argc, char *argv[]) {
     }
     
 exit:
-    cooked_mode(); // switch off raw mode
+    if (raw) cooked_mode(); // switch off raw mode
     exit(EXIT_SUCCESS);
 }
 
 static int connect_to_server() {
     int ret = 0;
     struct sockaddr_in server_addr;
+    struct hostent *host; 
+
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         printf("Error: could not create socket.\n");
         ret = -1;
     }
 
+    host = gethostbyname(HOSTNAME);
+
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // TODO: fix to have custom HOSTNAME
+    server_addr.sin_addr.s_addr = *(in_addr_t *) host->h_addr_list[0];
     
     if (connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
         printf("Error: could not connect to server.\n");

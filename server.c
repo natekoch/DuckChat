@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 exit:
     exit(EXIT_SUCCESS);
 }
-
+/*
 static int add_user(char *client_domain, char *client_port) {
     int ret = 0;
     // TODO: FINISH
@@ -100,3 +100,4 @@ static int add_user(char *client_domain, char *client_port) {
 
     return ret;
 }
+*/
