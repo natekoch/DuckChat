@@ -1,7 +1,6 @@
 #include "server.h"
 #include "duckchat.h"
 #include <netinet/in.h>
-#include <sys/_types/_socklen_t.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -39,12 +38,12 @@ int main(int argc, char *argv[]) {
     int listener = 0;
     struct sockaddr_in server_addr, client_addr;
 
-    if (listener = socket(AF_INET, SOCK_DGRAM, 0) < 0) {
+    if ((listener = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         printf("Error: could not create socket.\n");
     }
     
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htnos(PORT);
+    server_addr.sin_port = htons(PORT);
     server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     
     if (bind(listener, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
@@ -73,8 +72,10 @@ int main(int argc, char *argv[]) {
                 (socklen_t *) sizeof(client_addr));
         
         strcpy(client_domain, inet_ntoa(client_addr.sin_addr));
-        strcpy(client_port, ntohs(client_addr.sin_port));
-        
+        sprintf(client_port, "%d", ntohs(client_addr.sin_port));
+       
+        printf("%s:%s\n", client_domain, client_port);
+
         recv_packet = (struct text *) client_buffer;
 
         printf("%d\n", recv_packet->txt_type);
