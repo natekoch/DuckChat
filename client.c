@@ -12,6 +12,9 @@
 
 char current_channel[CHANNEL_MAX];
 char channels[20][CHANNEL_MAX];
+int num_channels = 0;
+
+int can_speak = 0; // determines if a user can send say messages
 
 int sockfd = 0;
 
@@ -122,7 +125,7 @@ int main(int argc, char *argv[]) {
                         if (manage_channels(channel, 'a') == 1) {
                             send_join(channel);
                         } else {
-                            printf("Already joined the maximum number of channels 20\n");
+                            printf("Already joined the maximum number of channels 20.\n");
                             printf("Please leave one before joining another.\n");
                             continue;
                         }
@@ -132,9 +135,12 @@ int main(int argc, char *argv[]) {
                         // leave channel 
                         if (manage_channels(channel, 'r') == 1) {
                             send_leave(channel);
+                            if (strcmp(channel, current_channel) == 0) {
+                                printf("Please switch channels or join a new channel.\n");
+                                can_speak = 0;
+                            }
                         } else {
-                            printf("Error: can't leave a channel not subscribed to: %s", channel);
-                            continue;
+                            printf("Error: can't leave a channel not subscribed to: %s\n", channel);
                         }
                     } else printf("Invalid usage: /leave channel\n");
                 } else if (strncmp(command, "/list", 5) == 0) {
@@ -157,7 +163,10 @@ int main(int argc, char *argv[]) {
                 strcpy(channel, "");
                 strcpy(command, "");
             } else { // send say message
-                send_say(input_buf);
+                if (can_speak)
+                    send_say(input_buf);
+                else 
+                    printf("Please switch channels or join a new channel.\n");
             }
             strcpy(input_buf, "");
 
@@ -232,6 +241,8 @@ static int manage_channels(char *channel, char flag) {
                 if (strcmp(channels[i], "") == 0) {
                     strcpy(channels[i], channel); // subscribe to channel
                     strcpy(current_channel, channel); // change to channel
+                    num_channels++;
+                    if (!can_speak) can_speak = 1;
                     ret = 1; // there was room so channel was added
                     break;
                 }
@@ -241,6 +252,7 @@ static int manage_channels(char *channel, char flag) {
             for (int i = 0; i < 20; i++) {
                 if (strcmp(channels[i], channel) == 0) {
                     strcpy(current_channel, channel); // switch to channel
+                    if (!can_speak) can_speak = 1;
                     ret = 1; // channel was found in channels
                     break;
                 }
@@ -250,6 +262,7 @@ static int manage_channels(char *channel, char flag) {
             for (int i = 0; i < 20; i++) {
                 if (strcmp(channels[i], channel) == 0) {
                     strcpy(channels[i], ""); // unsubscribe from channel
+                    num_channels--;
                     ret = 1; // channel was found in channels
                     break;
                 }
@@ -277,7 +290,7 @@ static void send_logout() {
 static void send_join(char *channel) {
     struct request_join join_init;
     join_init.req_type = REQ_JOIN;
-    strcpy(join_init.req_channel, current_channel);
+    strcpy(join_init.req_channel, channel);
 
     send(sockfd, &join_init, sizeof(join_init), 0);
 }
@@ -316,8 +329,6 @@ static void send_say(char *input) {
 
 static struct text* recv_packet() {
     memset(recv_buf, 0, sizeof(recv_buf));
-    struct text *recv_text;
-
     recv(sockfd, recv_buf, 1024, 0);
     
     return (struct text *) recv_buf;
