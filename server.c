@@ -1,6 +1,7 @@
 #include "server.h"
 #include "duckchat.h"
 #include <netinet/in.h>
+#include <sys/_types/_socklen_t.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -35,22 +36,52 @@ int main(int argc, char *argv[]) {
         goto exit;
     }
 
-    fd_set main_fds;
+    int listener = 0;
+    struct sockaddr_in server_addr, client_addr;
+
+    if (listener = socket(AF_INET, SOCK_DGRAM, 0) < 0) {
+        printf("Error: could not create socket.\n");
+    }
+    
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htnos(PORT);
+    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    
+    if (bind(listener, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        printf("Error: could not bind server and socket.\n");
+    }
+
     fd_set read_fds;
+
+    struct text *recv_packet;
+
+    char client_buffer[1024];
+
+    char client_domain[UNIX_PATH_MAX];
+    char client_port[5];
+
+    while (1) {
+
+        FD_ZERO(&read_fds);
+        FD_SET(listener, &read_fds);
+
+        select((listener+1), &read_fds, NULL, NULL, NULL);
+
+        memset(client_buffer, 0, sizeof(client_buffer));
+        recvfrom(listener, client_buffer, sizeof(client_buffer), 0, 
+                (struct sockaddr *)&client_addr, 
+                (socklen_t *) sizeof(client_addr));
+        
+        strcpy(client_domain, inet_ntoa(client_addr.sin_addr));
+        strcpy(client_port, ntohs(client_addr.sin_port));
+        
+        recv_packet = (struct text *) client_buffer;
+
+        printf("%d\n", recv_packet->txt_type);
+    }
+    
+    /*
     int fdmax;
-
-    int listener;
-    int latest_fd;
-    struct sockaddr_storage clientaddr;
-    socklen_t addrlen;
-
-    //char client_buf[1024];
-    //int nbytes;
-
-    //char remoteIP[INET_ADDRSTRLEN];
-
-    int yes=1;
-    int rev;
 
     struct addrinfo hints, *res, *temp;
     
@@ -119,7 +150,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    
+    */
 
 exit:
     exit(EXIT_SUCCESS);

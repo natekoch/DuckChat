@@ -16,7 +16,7 @@ int num_channels = 0;
 
 int can_speak = 0; // determines if a user can send say messages
 
-int sockfd = 0;
+int sockfd = 0; // TODO: REFACTOR make sockfd -> listener
 
 char HOSTNAME[UNIX_PATH_MAX]; 
 char USERNAME[USERNAME_MAX];
@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
         }
         strcpy(HOSTNAME, argv[1]);
 
+        // TODO: Restrict port number range. 
         char* port_fail;
         PORT = strtol(argv[2], &port_fail, 10);
         if (port_fail == argv[2] || *port_fail != '\0') {

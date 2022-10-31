@@ -2,3 +2,5 @@
 *.out
 client
 server
+test_bin/client
+test_bin/server
