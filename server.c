@@ -17,6 +17,8 @@ int PORT;
 
 int sockfd = 0;
 
+//struct sockaddr_in *client_addr;
+
 user *clients;
 
 channel *channels;
@@ -58,7 +60,10 @@ int main(int argc, char *argv[]) {
     }
 
     struct sockaddr_in server_addr, client_addr;
-    
+    socklen_t client_len = sizeof(client_addr); 
+    //client_addr = malloc(sizeof(struct sockaddr_in));
+    memset((char *)&client_addr, 0, sizeof(client_addr));
+
     struct hostent *host;
     host = gethostbyname(HOSTNAME); 
     
@@ -89,7 +94,7 @@ int main(int argc, char *argv[]) {
         memset(client_buffer, 0, sizeof(client_buffer));
         recvfrom(sockfd, client_buffer, sizeof(client_buffer), 0, 
                 (struct sockaddr *)&client_addr, 
-                (socklen_t *) sizeof(client_addr));
+                &client_len);
         printf("client addr: %ld\n", sizeof(client_addr)); 
 
         strcpy(client_domain, inet_ntoa(client_addr.sin_addr));
@@ -127,7 +132,7 @@ int main(int argc, char *argv[]) {
                     login_user(client_domain, client_port, recv_packet, &client_addr);
                 } else {
                     printf("Server is full.\n");
-                    // TODO: send error message
+                    send_error(client_domain, client_port, "Server is full.");
                 }
             } else {
                 // client is unknown and not requesting to login just ignore
@@ -226,21 +231,12 @@ static void login_user(char *client_domain, char *client_port, struct request *r
             strcpy(clients[i].name, login->req_username);
             strcpy(clients[i].domain, client_domain);
             strcpy(clients[i].port, client_port);
-            clients[i].address->sin_family = AF_INET;
-            clients[i].address->sin_port = client_addr->sin_port;
-            clients[i].address->sin_addr.s_addr = client_addr->sin_addr.s_addr;
+            *(clients[i].address) = *client_addr;
+            break;
         }
     }
     user_count++;
     printf("%s has logged in.\n", login->req_username);
-
-    // TEMP TEST
-    printf("From login user\n");
-    printf("%d\n", client_addr->sin_port);
-    printf("%d\n\n", client_addr->sin_addr.s_addr);
-
-    send_error(client_domain, client_port, "Test Error.\n");
-
 }
 
 static void logout_user(char *client_domain, char *client_port) {
@@ -265,40 +261,81 @@ static void logout_user(char *client_domain, char *client_port) {
     strcpy(clients[i].domain, "");
     strcpy(clients[i].port, "");
     for (int p = 0; p < MAX_CHANNELS; p++) {
+        // TODO: client needs to formerly leave all channels
         strcpy(clients[i].channels[p], "");
     }
     user_count--;
 }
-/*
+
 static int user_join(char *client_domain, char *client_port, struct request *recv_packet) {
     // TODO
     int ret = -1;
-    // look up user 
 
-    // look up channels does it exist ?
+    struct req_join *join = (struct req_join *) recv_packet;
+
+    // look up user
+    int i = lookup_user(client_domain, client_port);
+
+    // check if user already in channel
+    for (int k = 0; k < MAX_CHANNELS; k++) {
+        if (strcmp(clients[i].channels[k], join->req_channel) == 0) {
+            ret = 1;
+            goto end;
+        }
+    }
+
+    // look up channels does it exist?
+    int j = lookup_channel(join->req_channel);
     // yes add user to channel and update their channels
+    if (j != -1 && channels[j].nusers != MAX_USERS) {
+        for (int k = 0; k < MAX_USERS; k++) {
+            if (strcmp(channels[j].users[k], "") == 0) {
+                strcpy(channels[
+            }
+        }
+    }
 
     // no create channel and add user and update their channels
 
     // ret -1 if channel list is full 
+end:
     return ret; 
 }
 
 static int user_leave(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO
+    // TODO test
     int ret = -1;
+    
+    struct req_leave *leave = (struct req_leave *) recv_packet;
+
     // look up user
+    int i = lookup_user(client_domain, client_port);
 
     // look up channel to see if it exists
-    // remove user from channel indecies
-
+    int j = lookup_channel(leave->req_channel);
+    if (j != -1) {
+        // remove user from channel indecies
+        for (int k = 0; k < MAX_USERS; k++) {
+            if (strcmp(channels[j].users[k], clients[i].name) == 0) {
+                strcpy(channels[j].users[k], "");
+                ret = 1;
+                break;
+            }
+        }
+    }
     // remove channel from user channels list
+    for (int l = 0; l < MAX_CHANNELS; l++) {
+        if (strcmp(clients[i].channels[l], leave->req_channel) == 0) {
+            strcpy(clients[i].channels[l], "");
+            break;    
+        }
+    }
 
     // ret -1 if the channel doesn't exist or 
     // the user doesn't belong to the channel.
     return ret; 
 }
-*/
+
 static void send_error(char *client_domain, char *client_port, char *message) {
     // TODO
     int i = lookup_client(client_domain, client_port);
@@ -306,11 +343,7 @@ static void send_error(char *client_domain, char *client_port, char *message) {
     error.txt_type = TXT_ERROR;
     strncpy(error.txt_error, message, SAY_MAX);
 
-    printf("%ld\n", sendto(sockfd, &error, sizeof(error), 0, (struct sockaddr *) clients[i].address, sizeof(*clients[i].address)));
-    printf("%s\n", strerror(errno));
-    printf("addr siz: %ld\n", sizeof(*clients[i].address));
-    printf("error: %ld\n", sizeof(error));
-    printf("port: %d\n", clients[i].address->sin_port);
-    printf("addr: %d\n", clients[i].address->sin_addr.s_addr);
-    printf("family: %d\n", clients[i].address->sin_family);
+    sendto(sockfd, &error, sizeof(error), 0, 
+            (struct sockaddr *) clients[i].address, 
+            sizeof(*clients[i].address));
 }
