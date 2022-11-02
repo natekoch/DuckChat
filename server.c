@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <signal.h>
 
 char HOSTNAME[UNIX_PATH_MAX];
 int PORT;
@@ -41,6 +42,9 @@ int main(int argc, char *argv[]) {
         printf("Usage: ./server hostname port\n");
         goto exit;
     }
+
+    signal(SIGINT, exit_handler);
+    atexit(free_all);
 
     // Initialize clients array
     init_clients();
@@ -133,13 +137,22 @@ int main(int argc, char *argv[]) {
     }
 
 exit:
-    free_channels();
-    free_clients();
+    exit(EXIT_FAILURE);
+}
+
+static void exit_handler(int signum) {
+    (void) signum;
     exit(EXIT_SUCCESS);
 }
 
+static void free_all() {
+    if (channels != NULL)
+        free_channels();
+    if (clients != NULL)
+        free_clients();
+}
+
 static void init_channels() {
-    // TODO: test
     // init the channels array of channel elements
     channels = malloc(sizeof(channel) * MAX_CHANNELS);
     for (int i = 0; i < MAX_CHANNELS; i++) {
@@ -155,7 +168,6 @@ static void init_channels() {
 }
 
 static void init_clients() {
-    // TODO test
     // init the clients array of user elements
     clients = malloc(sizeof(user) * MAX_USERS);
     for (int i = 0; i < MAX_USERS; i++) {
@@ -174,7 +186,6 @@ static void init_clients() {
 }
 
 static void free_channels() {
-    // TODO test
     for (int i = 0; i < MAX_CHANNELS; i++) {
         for (int j = 0; j < MAX_USERS; j++) {
             free(channels[i].users[j]);
@@ -186,10 +197,9 @@ static void free_channels() {
 }
 
 static void free_clients() {
-    // TODO: test
     for (int i = 0; i < MAX_USERS; i++) {
         for (int j = 0; j < MAX_CHANNELS; j++) {
-            clients[i].channels[j] = malloc(CHANNEL_MAX);
+            free(clients[i].channels[j]);
         }
         free(clients[i].name);
         free(clients[i].domain);
@@ -221,11 +231,12 @@ static void login_user(char *client_domain, char *client_port, struct request *r
         }
     }
     user_count++;
+    printf("%s has logged in.\n", login->req_username);
 }
 
 static void logout_user(char *client_domain, char *client_port) {
     // remove user from clients
-    int i = lookup_client(client_domain, client_domain);
+    int i = lookup_client(client_domain, client_port);
 
     // remove user from all associated channels
     for (int j = 0; j < MAX_CHANNELS; j++) {
@@ -237,6 +248,8 @@ static void logout_user(char *client_domain, char *client_port) {
             }
         }
     }
+    
+    printf("%s has logged out.\n", clients[i].name);
 
     // Clear clients[i] entry
     strcpy(clients[i].name, "");
@@ -245,4 +258,5 @@ static void logout_user(char *client_domain, char *client_port) {
     for (int p = 0; p < MAX_CHANNELS; p++) {
         strcpy(clients[i].channels[p], "");
     }
+    user_count--;
 }

@@ -19,6 +19,10 @@ typedef struct channel {
     char **users;
 } channel;
 
+static void exit_handler(int);
+
+static void free_all();
+
 static void init_channels(void);
 
 static void init_clients(void);
@@ -32,7 +36,7 @@ static int lookup_client(char *, char *);
 static void login_user(char *, char *, struct request*);
 
 static void logout_user(char *, char *);
-
+/*
 static int user_join(struct request*);
 
 static int user_leave(struct request*);
@@ -44,5 +48,5 @@ static int user_list(struct request*);
 static int user_who(struct request*);
 
 static void send_error(char *);
-
+*/
 #endif
