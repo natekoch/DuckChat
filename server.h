@@ -37,11 +37,11 @@ static int lookup_client(char *, char *);
 static void login_user(char *, char *, struct request*, struct sockaddr_in*);
 
 static void logout_user(char *, char *);
-
+/*
 static int user_join(char *, char *, struct request*);
 
 static int user_leave(char *, char *, struct request*);
-/*
+
 static int user_say(char *, char *, struct request*);
 
 static int user_list(char *, char *, struct request*);

@@ -16,7 +16,6 @@ char HOSTNAME[UNIX_PATH_MAX];
 int PORT;
 
 int sockfd = 0;
-struct sockaddr_in server_addr, client_addr;
 
 user *clients;
 
@@ -58,6 +57,8 @@ int main(int argc, char *argv[]) {
         printf("Error: could not create socket.\n");
     }
 
+    struct sockaddr_in server_addr, client_addr;
+    
     struct hostent *host;
     host = gethostbyname(HOSTNAME); 
     
@@ -89,7 +90,8 @@ int main(int argc, char *argv[]) {
         recvfrom(sockfd, client_buffer, sizeof(client_buffer), 0, 
                 (struct sockaddr *)&client_addr, 
                 (socklen_t *) sizeof(client_addr));
-        
+        printf("client addr: %ld\n", sizeof(client_addr)); 
+
         strcpy(client_domain, inet_ntoa(client_addr.sin_addr));
         sprintf(client_port, "%d", ntohs(client_addr.sin_port));
        
@@ -122,7 +124,7 @@ int main(int argc, char *argv[]) {
             if (recv_packet->req_type == REQ_LOGIN) {
                 // client wants to login
                 if (user_count != 20) {
-                    login_user(client_domain, client_port, recv_packet);
+                    login_user(client_domain, client_port, recv_packet, &client_addr);
                 } else {
                     printf("Server is full.\n");
                     // TODO: send error message
@@ -224,13 +226,19 @@ static void login_user(char *client_domain, char *client_port, struct request *r
             strcpy(clients[i].name, login->req_username);
             strcpy(clients[i].domain, client_domain);
             strcpy(clients[i].port, client_port);
-            clients[i].address = client_addr;
+            clients[i].address->sin_family = AF_INET;
+            clients[i].address->sin_port = client_addr->sin_port;
+            clients[i].address->sin_addr.s_addr = client_addr->sin_addr.s_addr;
         }
     }
     user_count++;
     printf("%s has logged in.\n", login->req_username);
 
     // TEMP TEST
+    printf("From login user\n");
+    printf("%d\n", client_addr->sin_port);
+    printf("%d\n\n", client_addr->sin_addr.s_addr);
+
     send_error(client_domain, client_port, "Test Error.\n");
 
 }
@@ -261,7 +269,7 @@ static void logout_user(char *client_domain, char *client_port) {
     }
     user_count--;
 }
-
+/*
 static int user_join(char *client_domain, char *client_port, struct request *recv_packet) {
     // TODO
     int ret = -1;
@@ -290,7 +298,7 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
     // the user doesn't belong to the channel.
     return ret; 
 }
-
+*/
 static void send_error(char *client_domain, char *client_port, char *message) {
     // TODO
     int i = lookup_client(client_domain, client_port);
@@ -298,5 +306,11 @@ static void send_error(char *client_domain, char *client_port, char *message) {
     error.txt_type = TXT_ERROR;
     strncpy(error.txt_error, message, SAY_MAX);
 
-    sendto(sockfd, &error, sizeof(error), 0, (struct sockaddr *) clients[i].address, sizeof(*clients[i].address));
+    printf("%ld\n", sendto(sockfd, &error, sizeof(error), 0, (struct sockaddr *) clients[i].address, sizeof(*clients[i].address)));
+    printf("%s\n", strerror(errno));
+    printf("addr siz: %ld\n", sizeof(*clients[i].address));
+    printf("error: %ld\n", sizeof(error));
+    printf("port: %d\n", clients[i].address->sin_port);
+    printf("addr: %d\n", clients[i].address->sin_addr.s_addr);
+    printf("family: %d\n", clients[i].address->sin_family);
 }
