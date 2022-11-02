@@ -17,7 +17,7 @@ int num_channels = 0;
 
 int can_speak = 0; // determines if a user can send say messages
 
-int sockfd = 0; // TODO: REFACTOR make sockfd -> listener
+int sockfd = 0;
 
 char HOSTNAME[UNIX_PATH_MAX]; 
 char USERNAME[USERNAME_MAX];
