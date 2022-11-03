@@ -1,3 +1,14 @@
+/* 
+ * client.c
+ *
+ * Nate Koch
+ * UO CS 432
+ *
+ * usage: ./client <hostname> <port> <username>
+ *
+ * resources https://beej.us/guide/bgnet/html/
+ */
+
 #include "client.h"
 #include "duckchat.h"
 #include "raw.h"

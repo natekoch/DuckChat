@@ -1,12 +1,14 @@
-CIS 432 - Introduction to Computer Networks
+CS 432 - Introduction to Computer Networks
 Programming Assignment 01 - Undergraduate Students
 
 Please fill this form and send it together with your program.
 Put all the source files, makefile and this text file into a folder (name: your last name, all in lowercase letters), compress it into a tarball (i.e zip), and send using canvas submission page.
 Please include any special instructions for compiling and running your program on ix.
 
-Student Names:
-Student IDs:
+To compile just call make.
+
+Student Names: Nate Koch
+Student IDs: nkoch, 951763081
 
 Answer the questions by selecting one of the given options. You may add additional information if you wish to.
 
@@ -14,57 +16,57 @@ Answer the questions by selecting one of the given options. You may add addition
 Client Program
 --------------
 
-- Does the client compile and run? yes/no
+- Does the client compile and run? yes
 
-- Do login and logout work? yes/no
+- Do login and logout work? yes
 
-- Does the client accept user commands? yes/no
+- Does the client accept user commands? yes
 
 Please specify which of the following features work
 
-    - Join: works/doesn't work
+    - Join: works
 
-    - Leave: works/doesn't work
+    - Leave: works
 
-    - Say: works/doesn't work
+    - Say: works
 
-    - Switch: works/doesn't work
+    - Switch: works
 
-    - List: works/doesn't work
+    - List: works
 
-    - Who: works/doesn't work
+    - Who: works
 
 
-- Does the client send Keep Alive message when needed (for extra credit)? yes/no
+- Does the client send Keep Alive message when needed (for extra credit)? no
 
-- Does the client send Keep Alive message when not needed (for extra credit)? yes/no
+- Does the client send Keep Alive message when not needed (for extra credit)? no
 
-- Can the client handle messages that are out of order(e.g. /leave before a /join)? yes/no
+- Can the client handle messages that are out of order(e.g. /leave before a /join)? yes
 
-- Can the client redisplay the prompt and user input when a message from the server is received while the user is typing (for extra credit)? yes/no
+- Can the client redisplay the prompt and user input when a message from the server is received while the user is typing (for extra credit)? yes
 
 
 Server Program
 -------------
 
-- Does the server compile and run? yes/no
+- Does the server compile and run? yes
 
-- Does the server accept client requests? yes/no
+- Does the server accept client requests? yes
 
-- Do Login and Logout work? yes/no
+- Do Login and Logout work? yes
 
 Please specify which of the following features work
 
-    - Join: works/doesn't work
+    - Join: works
 
-    - Leave: works/doesn't work
+    - Leave: works
 
-    - Say: works/doesn't work
+    - Say: works
 
-    - List: works/doesn't work
+    - List: works
 
-    - Who: works/doesn't work
+    - Who: works
 
-- Does the server timeout users correctly (for extra credit)? yes/no
+- Does the server timeout users correctly (for extra credit)? no
 
-- Can the server handle messages that are out of order(e.g. /say before a client has logged in)? yes/no
+- Can the server handle messages that are out of order(e.g. /say before a client has logged in)? yes

@@ -1,3 +1,14 @@
+/* 
+ * server.c
+ *
+ * Nate Koch
+ * UO CS 432
+ *
+ * usage: ./server <hostname> <port>
+ *
+ * resources: https://beej.us/guide/bgnet/html/
+ */
+
 #include "server.h"
 #include "duckchat.h"
 #include <netinet/in.h>
