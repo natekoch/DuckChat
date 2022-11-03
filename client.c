@@ -372,17 +372,23 @@ static struct text* recv_packet() {
 
 static void recv_say(struct text *recv_text) {
     struct text_say *say_text = (struct text_say *) recv_text;
-
-    printf("[%s][%s]: %s\n",    say_text->txt_channel,
-                                say_text->txt_username,
-                                say_text->txt_text);
+    
+    if ((strlen(say_text->txt_channel) <= CHANNEL_MAX) &&
+        (strlen(say_text->txt_username) <= USERNAME_MAX) &&
+        (strlen(say_text->txt_text) <= SAY_MAX)) {
+    
+        printf("[%s][%s]: %s\n",    say_text->txt_channel,
+                                    say_text->txt_username,
+                                    say_text->txt_text);
+    }
 }
 
 static void recv_list(struct text *recv_text) {
     struct text_list *list_text = (struct text_list *) recv_text;
     printf("Existing channels:\n");
     for (int i = 0; i < list_text->txt_nchannels; i++) {
-        printf("\t%s\n", list_text->txt_channels[i].ch_channel);
+        if (strlen(list_text->txt_channels[i].ch_channel) <= CHANNEL_MAX)
+            printf("\t%s\n", list_text->txt_channels[i].ch_channel);
     }
 }
 
@@ -390,11 +396,13 @@ static void recv_who(struct text *recv_text) {
     struct text_who *who_text = (struct text_who *) recv_text;
     printf("Users on channel %s:\n", who_text->txt_channel);
     for (int i = 0; i < who_text->txt_nusernames; i++) {
-        printf("\t%s\n", who_text->txt_users[i].us_username);
+        if (strlen(who_text->txt_users[i].us_username) <= USERNAME_MAX)
+            printf("\t%s\n", who_text->txt_users[i].us_username);
     }
 }
 
 static void recv_error(struct text *recv_text) {
     struct text_error *error_text = (struct text_error *) recv_text;
-    printf("%s\n", error_text->txt_error);
+    if (strlen(error_text->txt_error) <= SAY_MAX) 
+        printf("%s\n", error_text->txt_error);
 }

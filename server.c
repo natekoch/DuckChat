@@ -250,9 +250,9 @@ static void login_user(char *client_domain, char *client_port, struct request *r
     struct request_login *login = (struct request_login *) recv_packet;
     for (int i = 0; i < MAX_USERS; i++) {
         if (strcmp(clients[i].name, "") == 0) {
-            strcpy(clients[i].name, login->req_username);
-            strcpy(clients[i].domain, client_domain);
-            strcpy(clients[i].port, client_port);
+            strncpy(clients[i].name, login->req_username, USERNAME_MAX);
+            strncpy(clients[i].domain, client_domain, UNIX_PATH_MAX);
+            strncpy(clients[i].port, client_port, 6);
             *(clients[i].address) = *client_addr;
             break;
         }
@@ -324,7 +324,7 @@ static int user_join(char *client_domain, char *client_port, struct request *rec
         // no create channel and add user and update their channels
         for (int k = 0; k < MAX_CHANNELS; k++) {
             if (strcmp(channels[k].name, "") == 0) {
-                strcpy(channels[k].name, join->req_channel);
+                strncpy(channels[k].name, join->req_channel, CHANNEL_MAX);
                 channels[k].nusers++;
                 channels[k].user_indecies[0] = i;
                 channel_count++;
@@ -396,6 +396,7 @@ static int user_say(char *client_domain, char *client_port, struct request *recv
     struct request_say *say = (struct request_say *) recv_packet;
 
     struct text_say send_say;
+    memset(&send_say, 0, sizeof(send_say));
 
     // lookup user
     int i = lookup_client(client_domain, client_port);
@@ -502,6 +503,8 @@ static int user_who(char *client_domain, char *client_port, struct request *recv
 static void send_error(char *client_domain, char *client_port, char *message) {
     int i = lookup_client(client_domain, client_port);
     struct text_error error;
+    memset(&error, 0, sizeof(error));
+    
     error.txt_type = TXT_ERROR;
     strncpy(error.txt_error, message, SAY_MAX);
 
