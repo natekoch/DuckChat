@@ -1,4 +1,4 @@
-CC=g++
+CC=gcc
 
 CFLAGS=-Wall -W -g -Werror 
 

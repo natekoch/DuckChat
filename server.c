@@ -17,8 +17,6 @@ int PORT;
 
 int sockfd = 0;
 
-//struct sockaddr_in *client_addr;
-
 user *clients;
 
 channel *channels;
@@ -112,15 +110,23 @@ int main(int argc, char *argv[]) {
             } else if (recv_packet->req_type == REQ_LOGOUT) {
                 logout_user(client_domain, client_port);
             } else if (recv_packet->req_type == REQ_JOIN) {
-                //user_join(client_domain, client_port, recv_packet);
+                if (user_join(client_domain, client_port, recv_packet) == -1) {
+                    send_error(client_domain, client_port, "Error: Requested channel is full.");
+                }
             } else if (recv_packet->req_type == REQ_LEAVE) {
-                //user_leave(client_domain, client_port, recv_packet);
+                if (user_leave(client_domain, client_port, recv_packet) == -1) {
+                    send_error(client_domain, client_port, "Error: User not subscribed or channel doesn't exist.");
+                }
             } else if (recv_packet->req_type == REQ_SAY) {
-                //user_say(client_domain, client_port, recv_packet);
+                if (user_say(client_domain, client_port, recv_packet) == -1) {
+                    send_error(client_domain, client_port, "Error: User tried to speak without first joining.");
+                }
             } else if (recv_packet->req_type == REQ_LIST) {
-                //user_list(client_domain, client_port, recv_packet);
+                user_list(client_domain, client_port, recv_packet);
             } else if (recv_packet->req_type == REQ_WHO) {
-                //user_who(client_domain, client_port, recv_pakcet);
+                if (user_who(client_domain, client_port, recv_packet) == -1) {
+                    send_error(client_domain, client_port, "Error: Channel does not exist.");
+                }
             } else {
                 printf("Received bogus packet. Ignoring.\n");
             }
@@ -132,7 +138,7 @@ int main(int argc, char *argv[]) {
                     login_user(client_domain, client_port, recv_packet, &client_addr);
                 } else {
                     printf("Server is full.\n");
-                    send_error(client_domain, client_port, "Server is full.");
+                    send_error(client_domain, client_port, "Error: Server is full.");
                 }
             } else {
                 // client is unknown and not requesting to login just ignore
@@ -224,6 +230,18 @@ static int lookup_client(char *client_domain, char *client_port) {
     return ret;
 }
 
+static int lookup_channel(char *channel_name) {
+    int ret = -1;
+    for (int i = 0; i < MAX_CHANNELS; i++) {
+        if (strcmp(channels[i].name, channel_name) == 0) {
+            ret = i;
+            break;
+        }
+    }
+
+    return ret;
+}
+
 static void login_user(char *client_domain, char *client_port, struct request *recv_packet, struct sockaddr_in *client_addr) {
     struct request_login *login = (struct request_login *) recv_packet;
     for (int i = 0; i < MAX_USERS; i++) {
@@ -268,34 +286,57 @@ static void logout_user(char *client_domain, char *client_port) {
 }
 
 static int user_join(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO
+    // TODO test
     int ret = -1;
+    int open_spot = -1;
 
-    struct req_join *join = (struct req_join *) recv_packet;
+    struct request_join *join = (struct request_join *) recv_packet;
+
+    // look up channel does it exist?
+    int j = lookup_channel(join->req_channel);
 
     // look up user
-    int i = lookup_user(client_domain, client_port);
+    int i = lookup_client(client_domain, client_port);
 
-    // check if user already in channel
-    for (int k = 0; k < MAX_CHANNELS; k++) {
-        if (strcmp(clients[i].channels[k], join->req_channel) == 0) {
-            ret = 1;
-            goto end;
-        }
-    }
+    if (j != -1) { 
 
-    // look up channels does it exist?
-    int j = lookup_channel(join->req_channel);
-    // yes add user to channel and update their channels
-    if (j != -1 && channels[j].nusers != MAX_USERS) {
-        for (int k = 0; k < MAX_USERS; k++) {
-            if (strcmp(channels[j].users[k], "") == 0) {
-                strcpy(channels[
+        // check if user already in channel
+        for (int k = 0; k < MAX_CHANNELS; k++) {
+            if (channels[j].user_indecies[k] == i) {
+                ret = 1;
+                goto end;
+            }
+            if (channels[j].user_indecies[k] == -1 && open_spot != -1) {
+                open_spot = k;
             }
         }
+
+        if (channels[j].nusers != MAX_USERS) {
+            // look for empty spot with for loop
+            channels[j].user_indecies[open_spot] = i;
+        } else {
+            goto end; // channel list was full
+        }
+    } else {
+        // no create channel and add user and update their channels
+        for (int k = 0; k < MAX_CHANNELS; k++) {
+            if (strcmp(channels[k].name, "") == 0) {
+                strcpy(channels[k].name, join->req_channel);
+                channels[k].nusers++;
+                channels[k].user_indecies[0] = i;
+                break;
+            }
+        }
+        channel_count++;
     }
 
-    // no create channel and add user and update their channels
+    // add channel to user's list
+    for (int k = 0; k < MAX_CHANNELS; k++) {
+        if (strcmp(clients[i].channels[k], "") == 0) {
+            strcpy(clients[j].channels[k], join->req_channel);
+            break;
+        }
+    }
 
     // ret -1 if channel list is full 
 end:
@@ -306,28 +347,34 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
     // TODO test
     int ret = -1;
     
-    struct req_leave *leave = (struct req_leave *) recv_packet;
+    struct request_leave *leave = (struct request_leave *) recv_packet;
 
     // look up user
-    int i = lookup_user(client_domain, client_port);
+    int i = lookup_client(client_domain, client_port);
 
     // look up channel to see if it exists
     int j = lookup_channel(leave->req_channel);
     if (j != -1) {
-        // remove user from channel indecies
-        for (int k = 0; k < MAX_USERS; k++) {
-            if (strcmp(channels[j].users[k], clients[i].name) == 0) {
-                strcpy(channels[j].users[k], "");
-                ret = 1;
+        // remove user from channel
+        for (int k = 0; k < MAX_CHANNELS; k++) {
+            if (channels[j].user_indecies[k] == i) {
+                channels[j].user_indecies[k] = -1;
+                channels[j].nusers--;
+                if (channels[j].nusers == 0) {
+                    // remove empty channel
+                    printf("%s now empty. Removing the channel.\n", leave->req_channel);
+                    strcpy(channels[j].name, "");
+                    channel_count--;
+                }
                 break;
             }
         }
-    }
-    // remove channel from user channels list
-    for (int l = 0; l < MAX_CHANNELS; l++) {
-        if (strcmp(clients[i].channels[l], leave->req_channel) == 0) {
-            strcpy(clients[i].channels[l], "");
-            break;    
+        // remove channel from user
+        for (int k = 0; k < MAX_CHANNELS; k++) {
+            if (strcmp(clients[i].channels[k], leave->req_channel) == 0) {
+                strcpy(clients[i].channels[k], "");
+                break;
+            }
         }
     }
 
@@ -336,8 +383,114 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
     return ret; 
 }
 
+static int user_say(char *client_domain, char *client_port, struct request *recv_packet) {
+    // TODO: test
+    int can_speak = -1;
+
+    struct request_say *say = (struct request_say *) recv_packet;
+
+    struct text_say send_say;
+
+    // lookup user
+    int i = lookup_client(client_domain, client_port);
+
+    // lookup channel
+    int j = lookup_channel(say->req_channel);
+    if (j != -1) {
+        // is user in requested channel
+        for (int k = 0; k < MAX_USERS; k++) {
+            if (channels[j].user_indecies[k] == i) {
+                can_speak = 1;
+                break;
+            }
+        }
+
+        if (can_speak) {
+            // user is in requested channel can speak
+            // for all users in channel send them the message
+            for (int k = 0; k < MAX_USERS; k++) {
+                if (channels[j].user_indecies[k] != -1) {
+                    send_say.txt_type = TXT_SAY;
+                    strncpy(send_say.txt_username, clients[i].name, USERNAME_MAX);
+                    strncpy(send_say.txt_channel, say->req_channel, CHANNEL_MAX);
+                    strncpy(send_say.txt_text, say->req_text, SAY_MAX);
+                    
+                    sendto(sockfd, &send_say, sizeof(send_say), 0, 
+                            (struct sockaddr *) clients[channels[j].user_indecies[k]].address, 
+                            sizeof(*clients[channels[j].user_indecies[k]].address));
+                }
+            }
+        }
+        // if user is not in requested channel cannot speak ret -1 
+    }
+
+    return can_speak;
+}
+
+static void user_list(char *client_domain, char *client_port, struct request *recv_packet) {
+    // TODO: TEST
+    struct request_list *list = (struct request_list *) recv_packet;
+
+    struct text_list send_list;
+
+    int i = lookup_client(client_domain, client_port);
+
+    send_list.txt_type = TXT_LIST;
+    send_list.txt_nchannels = channel_count;
+
+    int l = 0;
+    
+    for (int i = 0; i < MAX_CHANNELS; i++) {
+        if (strcmp(channels[i].name, "") != 0) {
+            strncpy(send_list.txt_channels[l].ch_channel, 
+                    channels[i].name, 
+                    CHANNEL_MAX);            
+            l++;
+        }
+    }
+
+    sendto(sockfd, &send_list, sizeof(send_list), 0, 
+            (struct sockaddr *) clients[i].address, 
+            sizeof(*clients[i].address));
+}
+
+static int user_who(char *client_domain, char *client_port, struct request *recv_packet) {
+    // TODO: TEST
+    int ret = -1;
+
+    struct request_who *who = (struct request_who *) recv_packet;
+
+    struct text_who send_who;
+    
+    int i = lookup_client(client_domain, client_port);
+
+    int j = lookup_channel(who->req_channel);
+
+    if (j != -1) {
+        send_who.txt_type = TXT_WHO;
+        send_who.txt_nusernames = channels[j].nusers;
+        strncpy(send_who.txt_channel, who->req_channel, CHANNEL_MAX);
+        int l = 0;
+        for (int k = 0; k < MAX_USERS; k++) {
+            if (channels[j].user_indecies[k] != -1) {
+                strncpy(send_who.txt_users[l].us_username, 
+                        clients[channels[j].user_indecies[k]].name, 
+                        USERNAME_MAX);
+                l++;
+            }
+        }
+        
+        sendto(sockfd, &send_who, sizeof(send_who), 0, 
+            (struct sockaddr *) clients[i].address, 
+            sizeof(*clients[i].address));
+    }
+
+    // return -1 if channel doesn't exist
+    return ret;
+}
+
 static void send_error(char *client_domain, char *client_port, char *message) {
-    // TODO
+    // TODO TEST
     int i = lookup_client(client_domain, client_port);
     struct text_error error;
     error.txt_type = TXT_ERROR;

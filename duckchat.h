@@ -108,7 +108,7 @@ struct channel_info {
 struct text_list {
         text_t txt_type; /* = TXT_LIST */
         int txt_nchannels;
-        struct channel_info txt_channels[0]; // May actually be more than 0
+        struct channel_info txt_channels[20]; // May actually be more than 0
 } packed;
 
 /* This is a substructure used by text_who. */
@@ -120,7 +120,7 @@ struct text_who {
         text_t txt_type; /* = TXT_WHO */
         int txt_nusernames;
         char txt_channel[CHANNEL_MAX]; // The channel requested
-        struct user_info txt_users[0]; // May actually be more than 0
+        struct user_info txt_users[20]; // May actually be more than 0
 } packed;
 
 struct text_error {
