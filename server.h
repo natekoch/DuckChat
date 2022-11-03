@@ -46,7 +46,7 @@ static int user_leave(char *, char *, struct request*);
 
 static int user_say(char *, char *, struct request*);
 
-static void user_list(char *, char *, struct request*);
+static void user_list(char *, char *);
 
 static int user_who(char *, char *, struct request*);
 

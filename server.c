@@ -82,6 +82,8 @@ int main(int argc, char *argv[]) {
     char client_domain[UNIX_PATH_MAX];
     char client_port[5];
 
+    int ret;
+
     while (1) {
 
         FD_ZERO(&read_fds);
@@ -90,16 +92,17 @@ int main(int argc, char *argv[]) {
         select((sockfd+1), &read_fds, NULL, NULL, NULL);
 
         memset(client_buffer, 0, sizeof(client_buffer));
-        recvfrom(sockfd, client_buffer, sizeof(client_buffer), 0, 
+        ret = recvfrom(sockfd, client_buffer, sizeof(client_buffer), 0, 
                 (struct sockaddr *)&client_addr, 
                 &client_len);
-        printf("client addr: %ld\n", sizeof(client_addr)); 
+
+        if (ret == 0) {
+            printf("Client has disconnected.\n");
+        }
 
         strcpy(client_domain, inet_ntoa(client_addr.sin_addr));
         sprintf(client_port, "%d", ntohs(client_addr.sin_port));
        
-        printf("%s:%s\n", client_domain, client_port);
-
         recv_packet = (struct request *) client_buffer;
 
         // check if client is known
@@ -122,7 +125,7 @@ int main(int argc, char *argv[]) {
                     send_error(client_domain, client_port, "Error: User tried to speak without first joining.");
                 }
             } else if (recv_packet->req_type == REQ_LIST) {
-                user_list(client_domain, client_port, recv_packet);
+                user_list(client_domain, client_port);
             } else if (recv_packet->req_type == REQ_WHO) {
                 if (user_who(client_domain, client_port, recv_packet) == -1) {
                     send_error(client_domain, client_port, "Error: Channel does not exist.");
@@ -157,6 +160,7 @@ static void exit_handler(int signum) {
 }
 
 static void free_all() {
+    close(sockfd);
     if (channels != NULL)
         free_channels();
     if (clients != NULL)
@@ -279,14 +283,12 @@ static void logout_user(char *client_domain, char *client_port) {
     strcpy(clients[i].domain, "");
     strcpy(clients[i].port, "");
     for (int p = 0; p < MAX_CHANNELS; p++) {
-        // TODO: client needs to formerly leave all channels
         strcpy(clients[i].channels[p], "");
     }
     user_count--;
 }
 
 static int user_join(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO test
     int ret = -1;
     int open_spot = -1;
 
@@ -306,14 +308,15 @@ static int user_join(char *client_domain, char *client_port, struct request *rec
                 ret = 1;
                 goto end;
             }
-            if (channels[j].user_indecies[k] == -1 && open_spot != -1) {
+            if (channels[j].user_indecies[k] == -1 && open_spot == -1) {
                 open_spot = k;
             }
         }
-
+        // add user to existing channel
         if (channels[j].nusers != MAX_USERS) {
-            // look for empty spot with for loop
+            // use the found empty spot
             channels[j].user_indecies[open_spot] = i;
+            channels[j].nusers++;
         } else {
             goto end; // channel list was full
         }
@@ -324,19 +327,22 @@ static int user_join(char *client_domain, char *client_port, struct request *rec
                 strcpy(channels[k].name, join->req_channel);
                 channels[k].nusers++;
                 channels[k].user_indecies[0] = i;
+                channel_count++;
                 break;
             }
         }
-        channel_count++;
+        printf("%s has been created by %s.\n", join->req_channel, clients[i].name);
     }
 
     // add channel to user's list
     for (int k = 0; k < MAX_CHANNELS; k++) {
         if (strcmp(clients[i].channels[k], "") == 0) {
-            strcpy(clients[j].channels[k], join->req_channel);
+            strcpy(clients[i].channels[k], join->req_channel);
             break;
         }
     }
+    ret = 1;
+    printf("%s has joined %s.\n", clients[i].name, join->req_channel);
 
     // ret -1 if channel list is full 
 end:
@@ -344,7 +350,6 @@ end:
 }
 
 static int user_leave(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO test
     int ret = -1;
     
     struct request_leave *leave = (struct request_leave *) recv_packet;
@@ -360,6 +365,7 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
             if (channels[j].user_indecies[k] == i) {
                 channels[j].user_indecies[k] = -1;
                 channels[j].nusers--;
+                printf("%s has now left %s.\n", clients[i].name, channels[j].name);
                 if (channels[j].nusers == 0) {
                     // remove empty channel
                     printf("%s now empty. Removing the channel.\n", leave->req_channel);
@@ -376,6 +382,7 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
                 break;
             }
         }
+        ret = 1;
     }
 
     // ret -1 if the channel doesn't exist or 
@@ -384,7 +391,6 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
 }
 
 static int user_say(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO: test
     int can_speak = -1;
 
     struct request_say *say = (struct request_say *) recv_packet;
@@ -420,6 +426,7 @@ static int user_say(char *client_domain, char *client_port, struct request *recv
                             sizeof(*clients[channels[j].user_indecies[k]].address));
                 }
             }
+            printf("%s sent a message in %s.\n", clients[i].name, say->req_channel);
         }
         // if user is not in requested channel cannot speak ret -1 
     }
@@ -427,19 +434,16 @@ static int user_say(char *client_domain, char *client_port, struct request *recv
     return can_speak;
 }
 
-static void user_list(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO: TEST
-    struct request_list *list = (struct request_list *) recv_packet;
-
+static void user_list(char *client_domain, char *client_port) {
     struct text_list send_list;
+    memset(&send_list, 0, sizeof(send_list));
 
     int i = lookup_client(client_domain, client_port);
-
+    
     send_list.txt_type = TXT_LIST;
     send_list.txt_nchannels = channel_count;
 
     int l = 0;
-    
     for (int i = 0; i < MAX_CHANNELS; i++) {
         if (strcmp(channels[i].name, "") != 0) {
             strncpy(send_list.txt_channels[l].ch_channel, 
@@ -452,15 +456,17 @@ static void user_list(char *client_domain, char *client_port, struct request *re
     sendto(sockfd, &send_list, sizeof(send_list), 0, 
             (struct sockaddr *) clients[i].address, 
             sizeof(*clients[i].address));
+
+    printf("%s requested the list of channels.\n", clients[i].name);
 }
 
 static int user_who(char *client_domain, char *client_port, struct request *recv_packet) {
-    // TODO: TEST
     int ret = -1;
 
     struct request_who *who = (struct request_who *) recv_packet;
 
     struct text_who send_who;
+    memset(&send_who, 0, sizeof(send_who));
     
     int i = lookup_client(client_domain, client_port);
 
@@ -483,6 +489,10 @@ static int user_who(char *client_domain, char *client_port, struct request *recv
         sendto(sockfd, &send_who, sizeof(send_who), 0, 
             (struct sockaddr *) clients[i].address, 
             sizeof(*clients[i].address));
+        
+        ret = 1;
+
+        printf("%s asked who was in %s.\n", clients[i].name, who->req_channel);
     }
 
     // return -1 if channel doesn't exist
@@ -490,7 +500,6 @@ static int user_who(char *client_domain, char *client_port, struct request *recv
 }
 
 static void send_error(char *client_domain, char *client_port, char *message) {
-    // TODO TEST
     int i = lookup_client(client_domain, client_port);
     struct text_error error;
     error.txt_type = TXT_ERROR;
@@ -499,4 +508,6 @@ static void send_error(char *client_domain, char *client_port, char *message) {
     sendto(sockfd, &error, sizeof(error), 0, 
             (struct sockaddr *) clients[i].address, 
             sizeof(*clients[i].address));
+
+    printf("Sent error message to %s.\n", clients[i].name);
 }

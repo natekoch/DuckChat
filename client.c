@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
+#include <signal.h>
 
 char current_channel[CHANNEL_MAX];
 char channels[20][CHANNEL_MAX];
@@ -26,6 +27,8 @@ int PORT;
 char recv_buf[1024];
 
 int raw = 0;
+
+int logged_in = 0;
 
 int main(int argc, char *argv[]) {
     
@@ -55,6 +58,9 @@ int main(int argc, char *argv[]) {
         printf("Usage: ./client server_socket server_port username\n");
         goto exit;
     }
+
+    signal(SIGINT, exit_handler);
+    atexit(disconnect);
 
     // connect to server
     if (connect_to_server() < 0) goto exit; 
@@ -207,8 +213,18 @@ int main(int argc, char *argv[]) {
     }
     
 exit:
-    if (raw) cooked_mode(); // switch off raw mode
     exit(EXIT_SUCCESS);
+}
+
+static void exit_handler(int signum) {
+    (void) signum;
+    exit(EXIT_SUCCESS);
+}
+
+static void disconnect() {
+    close(sockfd);
+    if (raw) cooked_mode();
+    if (logged_in) send_logout();
 }
 
 static int connect_to_server() {
@@ -283,21 +299,28 @@ static int manage_channels(char *channel, char flag) {
 
 static void send_login() {
     struct request_login login;
+    memset(&login, 0, sizeof(login));
     login.req_type = REQ_LOGIN;
     strcpy(login.req_username, USERNAME);
 
     send(sockfd, &login, sizeof(login), 0);
+    
+    logged_in = 1;
 }
 
 static void send_logout() {
     struct request_logout logout;
+    memset(&logout, 0, sizeof(logout));
     logout.req_type = REQ_LOGOUT;
 
     send(sockfd, &logout, sizeof(logout), 0);
+
+    logged_in = 0;
 }
 
 static void send_join(char *channel) {
     struct request_join join_init;
+    memset(&join_init, 0, sizeof(join_init));
     join_init.req_type = REQ_JOIN;
     strcpy(join_init.req_channel, channel);
 
@@ -306,6 +329,7 @@ static void send_join(char *channel) {
 
 static void send_leave(char *channel) {
     struct request_leave leave;
+    memset(&leave, 0, sizeof(leave));
     leave.req_type = REQ_LEAVE;
     strcpy(leave.req_channel, channel);
 
@@ -314,6 +338,7 @@ static void send_leave(char *channel) {
 
 static void send_list() {
     struct request_list list;
+    memset(&list, 0, sizeof(list));
     list.req_type = REQ_LIST;
 
     send(sockfd, &list, sizeof(list), 0);
@@ -321,6 +346,7 @@ static void send_list() {
 
 static void send_who(char *channel) {
     struct request_who who;
+    memset(&who, 0, sizeof(who));
     who.req_type = REQ_WHO;
     strcpy(who.req_channel, channel);
 
@@ -329,6 +355,7 @@ static void send_who(char *channel) {
 
 static void send_say(char *input) {
     struct request_say msg;
+    memset(&msg, 0, sizeof(msg));
     msg.req_type = REQ_SAY;
     strcpy(msg.req_channel, current_channel);
     strcpy(msg.req_text, input);

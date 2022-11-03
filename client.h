@@ -2,6 +2,11 @@
 #define CLIENT_H
 
 #include "duckchat.h"
+
+static void exit_handler(int);
+
+static void disconnect(void);
+
 static int connect_to_server(void);
 
 static int manage_channels(char *, char);
