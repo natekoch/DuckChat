@@ -12,16 +12,18 @@
 #include <string.h>
 #include <signal.h>
 
+// store command line inputs
 char HOSTNAME[UNIX_PATH_MAX];
 int PORT;
 
 int sockfd = 0;
 
-user *clients;
-
-channel *channels;
-
+// keep track of the users
+user *clients; 
 int user_count = 0;
+
+// keep track of the channels
+channel *channels; 
 int channel_count = 0;
 
 int main(int argc, char *argv[]) {
@@ -45,6 +47,7 @@ int main(int argc, char *argv[]) {
         goto exit;
     }
 
+    // catch the hostuser closing the server
     signal(SIGINT, exit_handler);
     atexit(free_all);
 
@@ -53,13 +56,13 @@ int main(int argc, char *argv[]) {
     // Initialize channels array
     init_channels();
 
+    // create the socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         printf("Error: could not create socket.\n");
     }
 
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_len = sizeof(client_addr); 
-    //client_addr = malloc(sizeof(struct sockaddr_in));
     memset((char *)&client_addr, 0, sizeof(client_addr));
 
     struct hostent *host;
@@ -91,12 +94,13 @@ int main(int argc, char *argv[]) {
 
         select((sockfd+1), &read_fds, NULL, NULL, NULL);
 
+        // receive the packet from a client
         memset(client_buffer, 0, sizeof(client_buffer));
         ret = recvfrom(sockfd, client_buffer, sizeof(client_buffer), 0, 
                 (struct sockaddr *)&client_addr, 
                 &client_len);
 
-        if (ret == 0) {
+        if (ret == 0) { // this doesn't work but doesn't do any harm
             printf("Client has disconnected.\n");
         }
 
@@ -114,21 +118,25 @@ int main(int argc, char *argv[]) {
                 logout_user(client_domain, client_port);
             } else if (recv_packet->req_type == REQ_JOIN) {
                 if (user_join(client_domain, client_port, recv_packet) == -1) {
-                    send_error(client_domain, client_port, "Error: Requested channel is full.");
+                    send_error(client_domain, client_port, 
+                                "Error: Requested channel is full.");
                 }
             } else if (recv_packet->req_type == REQ_LEAVE) {
                 if (user_leave(client_domain, client_port, recv_packet) == -1) {
-                    send_error(client_domain, client_port, "Error: User not subscribed or channel doesn't exist.");
+                    send_error(client_domain, client_port, 
+                        "Error: User not subscribed or channel doesn't exist.");
                 }
             } else if (recv_packet->req_type == REQ_SAY) {
                 if (user_say(client_domain, client_port, recv_packet) == -1) {
-                    send_error(client_domain, client_port, "Error: User tried to speak without first joining.");
+                    send_error(client_domain, client_port, 
+                        "Error: User tried to speak without first joining.");
                 }
             } else if (recv_packet->req_type == REQ_LIST) {
                 user_list(client_domain, client_port);
             } else if (recv_packet->req_type == REQ_WHO) {
                 if (user_who(client_domain, client_port, recv_packet) == -1) {
-                    send_error(client_domain, client_port, "Error: Channel does not exist.");
+                    send_error(client_domain, client_port, 
+                                "Error: Channel does not exist.");
                 }
             } else {
                 printf("Received bogus packet. Ignoring.\n");
@@ -138,10 +146,12 @@ int main(int argc, char *argv[]) {
             if (recv_packet->req_type == REQ_LOGIN) {
                 // client wants to login
                 if (user_count != 20) {
-                    login_user(client_domain, client_port, recv_packet, &client_addr);
+                    login_user(client_domain, client_port, recv_packet, 
+                                &client_addr);
                 } else {
                     printf("Server is full.\n");
-                    send_error(client_domain, client_port, "Error: Server is full.");
+                    send_error(client_domain, client_port, 
+                                "Error: Server is full.");
                 }
             } else {
                 // client is unknown and not requesting to login just ignore
@@ -154,11 +164,13 @@ exit:
     exit(EXIT_FAILURE);
 }
 
+// catch the host closing the server to have graceful exit.
 static void exit_handler(int signum) {
     (void) signum;
     exit(EXIT_SUCCESS);
 }
 
+// socket and memory cleanup. 
 static void free_all() {
     close(sockfd);
     if (channels != NULL)
@@ -167,6 +179,7 @@ static void free_all() {
         free_clients();
 }
 
+// initialize the channels list
 static void init_channels() {
     // init the channels array of channel elements
     channels = malloc(sizeof(channel) * MAX_CHANNELS);
@@ -181,6 +194,7 @@ static void init_channels() {
     }
 }
 
+// initialize the clients list
 static void init_clients() {
     // init the clients array of user elements
     clients = malloc(sizeof(user) * MAX_USERS);
@@ -200,6 +214,7 @@ static void init_clients() {
     }
 }
 
+// free the channels list
 static void free_channels() {
     for (int i = 0; i < MAX_CHANNELS; i++) {
         free(channels[i].name);
@@ -208,6 +223,7 @@ static void free_channels() {
     free(channels);
 }
 
+// free the clients list
 static void free_clients() {
     for (int i = 0; i < MAX_USERS; i++) {
         for (int j = 0; j < MAX_CHANNELS; j++) {
@@ -222,6 +238,8 @@ static void free_clients() {
     free(clients);
 }
 
+// look up a client and give the index to their spot in the clients list
+// return -1 if they aren't a logged in client
 static int lookup_client(char *client_domain, char *client_port) {
     int ret = -1;
     for (int i = 0; i < MAX_CHANNELS; i++) {
@@ -234,6 +252,8 @@ static int lookup_client(char *client_domain, char *client_port) {
     return ret;
 }
 
+// look up a channel by its name and give the index to its spot in the channels
+// list return -1 if the channel doesn't exist
 static int lookup_channel(char *channel_name) {
     int ret = -1;
     for (int i = 0; i < MAX_CHANNELS; i++) {
@@ -246,7 +266,10 @@ static int lookup_channel(char *channel_name) {
     return ret;
 }
 
-static void login_user(char *client_domain, char *client_port, struct request *recv_packet, struct sockaddr_in *client_addr) {
+// login the new user
+static void login_user(char *client_domain, char *client_port, 
+                        struct request *recv_packet, 
+                        struct sockaddr_in *client_addr) {
     struct request_login *login = (struct request_login *) recv_packet;
     for (int i = 0; i < MAX_USERS; i++) {
         if (strcmp(clients[i].name, "") == 0) {
@@ -261,6 +284,7 @@ static void login_user(char *client_domain, char *client_port, struct request *r
     printf("%s has logged in.\n", login->req_username);
 }
 
+// logout the logged in user and remove them from their channels
 static void logout_user(char *client_domain, char *client_port) {
     // remove user from clients
     int i = lookup_client(client_domain, client_port);
@@ -271,6 +295,15 @@ static void logout_user(char *client_domain, char *client_port) {
             if (channels[j].user_indecies[k] == i) {
                 channels[j].user_indecies[k] = -1;
                 channels[j].nusers--;
+                printf("%s has now left %s.\n", clients[i].name, 
+                        channels[j].name);
+                if (channels[j].nusers == 0) {
+                    // remove empty channel
+                    printf("%s now empty. Removing the channel.\n", 
+                            channels[j].name);
+                    strcpy(channels[j].name, "");
+                    channel_count--;
+                }
                 break;
             }
         }
@@ -288,7 +321,9 @@ static void logout_user(char *client_domain, char *client_port) {
     user_count--;
 }
 
-static int user_join(char *client_domain, char *client_port, struct request *recv_packet) {
+// handle the user requesting to join the specified channel
+static int user_join(char *client_domain, char *client_port, 
+                        struct request *recv_packet) {
     int ret = -1;
     int open_spot = -1;
 
@@ -331,7 +366,8 @@ static int user_join(char *client_domain, char *client_port, struct request *rec
                 break;
             }
         }
-        printf("%s has been created by %s.\n", join->req_channel, clients[i].name);
+        printf("%s has been created by %s.\n", join->req_channel, 
+                                                            clients[i].name);
     }
 
     // add channel to user's list
@@ -349,7 +385,9 @@ end:
     return ret; 
 }
 
-static int user_leave(char *client_domain, char *client_port, struct request *recv_packet) {
+// handle the user requesting to leave the specified channel
+static int user_leave(char *client_domain, char *client_port, 
+                                                struct request *recv_packet) {
     int ret = -1;
     
     struct request_leave *leave = (struct request_leave *) recv_packet;
@@ -365,10 +403,12 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
             if (channels[j].user_indecies[k] == i) {
                 channels[j].user_indecies[k] = -1;
                 channels[j].nusers--;
-                printf("%s has now left %s.\n", clients[i].name, channels[j].name);
+                printf("%s has now left %s.\n", clients[i].name, 
+                        channels[j].name);
                 if (channels[j].nusers == 0) {
                     // remove empty channel
-                    printf("%s now empty. Removing the channel.\n", leave->req_channel);
+                    printf("%s now empty. Removing the channel.\n", 
+                            leave->req_channel);
                     strcpy(channels[j].name, "");
                     channel_count--;
                 }
@@ -390,7 +430,10 @@ static int user_leave(char *client_domain, char *client_port, struct request *re
     return ret; 
 }
 
-static int user_say(char *client_domain, char *client_port, struct request *recv_packet) {
+// handle the user sending a message in the specified channel and send the text
+// of their message to all the users in that channel
+static int user_say(char *client_domain, char *client_port, 
+                                                struct request *recv_packet) {
     int can_speak = -1;
 
     struct request_say *say = (struct request_say *) recv_packet;
@@ -418,13 +461,16 @@ static int user_say(char *client_domain, char *client_port, struct request *recv
             for (int k = 0; k < MAX_USERS; k++) {
                 if (channels[j].user_indecies[k] != -1) {
                     send_say.txt_type = TXT_SAY;
-                    strncpy(send_say.txt_username, clients[i].name, USERNAME_MAX);
-                    strncpy(send_say.txt_channel, say->req_channel, CHANNEL_MAX);
+                    strncpy(send_say.txt_username, clients[i].name, 
+                            USERNAME_MAX);
+                    strncpy(send_say.txt_channel, say->req_channel, 
+                            CHANNEL_MAX);
                     strncpy(send_say.txt_text, say->req_text, SAY_MAX);
                     
                     sendto(sockfd, &send_say, sizeof(send_say), 0, 
-                            (struct sockaddr *) clients[channels[j].user_indecies[k]].address, 
-                            sizeof(*clients[channels[j].user_indecies[k]].address));
+                            (struct sockaddr *) 
+                            clients[channels[j].user_indecies[k]].address, 
+                        sizeof(*clients[channels[j].user_indecies[k]].address));
                 }
             }
             printf("%s sent a message in %s.\n", clients[i].name, say->req_channel);
@@ -435,6 +481,7 @@ static int user_say(char *client_domain, char *client_port, struct request *recv
     return can_speak;
 }
 
+// handle the user requesting to get a list of all the channels on the server
 static void user_list(char *client_domain, char *client_port) {
     struct text_list send_list;
     memset(&send_list, 0, sizeof(send_list));
@@ -461,7 +508,10 @@ static void user_list(char *client_domain, char *client_port) {
     printf("%s requested the list of channels.\n", clients[i].name);
 }
 
-static int user_who(char *client_domain, char *client_port, struct request *recv_packet) {
+// handle the user requesting to have a list of all the users on the 
+// specified channels
+static int user_who(char *client_domain, char *client_port, 
+                                            struct request *recv_packet) {
     int ret = -1;
 
     struct request_who *who = (struct request_who *) recv_packet;
@@ -500,6 +550,7 @@ static int user_who(char *client_domain, char *client_port, struct request *recv
     return ret;
 }
 
+// send an error message to the user that caused the erro
 static void send_error(char *client_domain, char *client_port, char *message) {
     int i = lookup_client(client_domain, client_port);
     struct text_error error;

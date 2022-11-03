@@ -12,23 +12,28 @@
 #include <netdb.h>
 #include <signal.h>
 
-char current_channel[CHANNEL_MAX];
-char channels[20][CHANNEL_MAX];
-int num_channels = 0;
+char current_channel[CHANNEL_MAX]; // keep track of current channel
+char channels[20][CHANNEL_MAX]; // keep track of list of subscribed channels
+int num_channels = 0; // count the number of subscribed channels
 
 int can_speak = 0; // determines if a user can send say messages
 
-int sockfd = 0;
+int sockfd = 0; // client socket
 
+// store the user command line inputs
 char HOSTNAME[UNIX_PATH_MAX]; 
 char USERNAME[USERNAME_MAX];
 int PORT;
 
+// store the incoming packets
 char recv_buf[1024];
 
+// flag for if raw mode was enabled
 int raw = 0;
 
+// flag for if the user has been logged in
 int logged_in = 0;
+
 
 int main(int argc, char *argv[]) {
     
@@ -136,8 +141,10 @@ int main(int argc, char *argv[]) {
                         if (manage_channels(channel, 'a') == 1) {
                             send_join(channel);
                         } else {
-                            printf("Already joined the maximum number of channels 20.\n");
-                            printf("Please leave one before joining another.\n");
+                            printf("Already joined the maximum number");
+                            printf(" of channels 20.\n");
+                            printf("Please leave one before");
+                            printf(" joining another.\n");
                             continue;
                         }
                     } else printf("Invalid usage: /join channel\n");
@@ -147,11 +154,13 @@ int main(int argc, char *argv[]) {
                         if (manage_channels(channel, 'r') == 1) {
                             send_leave(channel);
                             if (strcmp(channel, current_channel) == 0) {
-                                printf("Please switch channels or join a new channel.\n");
+                                printf("Please switch channels or join a");
+                                printf(" new channel.\n");
                                 can_speak = 0;
                             }
                         } else {
-                            printf("Error: can't leave a channel not subscribed to: %s\n", channel);
+                            printf("Error: can't leave a channel not ");
+                            printf("subscribed to: %s\n", channel);
                         }
                     } else printf("Invalid usage: /leave channel\n");
                 } else if (strncmp(command, "/list", 5) == 0) {
@@ -191,6 +200,7 @@ int main(int argc, char *argv[]) {
                 printf("\b \b");
             }
 
+            // direct the packet to the proper handler
             if (recv_text->txt_type == TXT_SAY) {
                 recv_say(recv_text); 
             } else if (recv_text->txt_type == TXT_LIST) {
@@ -216,17 +226,20 @@ exit:
     exit(EXIT_SUCCESS);
 }
 
+// catch the user closing the client program
 static void exit_handler(int signum) {
     (void) signum;
     exit(EXIT_SUCCESS);
 }
 
+// disconnect the user with atexit
 static void disconnect() {
     close(sockfd);
     if (raw) cooked_mode();
     if (logged_in) send_logout();
 }
 
+// connect the client to the server
 static int connect_to_server() {
     int ret = 0;
     struct sockaddr_in server_addr;
@@ -243,19 +256,23 @@ static int connect_to_server() {
     server_addr.sin_port = htons(PORT);
     server_addr.sin_addr.s_addr = *(in_addr_t *) host->h_addr_list[0];
     
-    if (connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sockfd, (struct sockaddr *) &server_addr, 
+                                            sizeof(server_addr)) < 0) {
         printf("Error: could not connect to server.\n");
         ret = -1;
     }
     return ret;
 }
 
+// make the channels list empty
 static void init_channels() {
     for (int i = 0; i < 20; i++) {
         strcpy(channels[i], "");
     }
 }
 
+// manage when the channels list when a user 
+// adds, switches, or removes a channel
 static int manage_channels(char *channel, char flag) {
     // default channel was not found or there was no room in channels.
     int ret = 0; 
@@ -297,6 +314,7 @@ static int manage_channels(char *channel, char flag) {
     return ret;
 }
 
+// send a login request packet to the server
 static void send_login() {
     struct request_login login;
     memset(&login, 0, sizeof(login));
@@ -308,6 +326,7 @@ static void send_login() {
     logged_in = 1;
 }
 
+// send a logout request packet to the server
 static void send_logout() {
     struct request_logout logout;
     memset(&logout, 0, sizeof(logout));
@@ -318,6 +337,7 @@ static void send_logout() {
     logged_in = 0;
 }
 
+// send a join request to the server for the specified channel
 static void send_join(char *channel) {
     struct request_join join_init;
     memset(&join_init, 0, sizeof(join_init));
@@ -327,6 +347,7 @@ static void send_join(char *channel) {
     send(sockfd, &join_init, sizeof(join_init), 0);
 }
 
+// send a leave request to the server for the specfied channel
 static void send_leave(char *channel) {
     struct request_leave leave;
     memset(&leave, 0, sizeof(leave));
@@ -336,6 +357,7 @@ static void send_leave(char *channel) {
     send(sockfd, &leave, sizeof(leave), 0);
 }
 
+// send a list request to the server
 static void send_list() {
     struct request_list list;
     memset(&list, 0, sizeof(list));
@@ -344,6 +366,7 @@ static void send_list() {
     send(sockfd, &list, sizeof(list), 0);
 }
 
+// send a who request to the server for the specified channels
 static void send_who(char *channel) {
     struct request_who who;
     memset(&who, 0, sizeof(who));
@@ -353,6 +376,7 @@ static void send_who(char *channel) {
     send(sockfd, &who, sizeof(who), 0);
 }
 
+// send a say message packet to the server
 static void send_say(char *input) {
     struct request_say msg;
     memset(&msg, 0, sizeof(msg));
@@ -363,6 +387,7 @@ static void send_say(char *input) {
     send(sockfd, &msg, sizeof(msg), 0);
 }
 
+// receive a generic text packet and copy it to the buffer
 static struct text* recv_packet() {
     memset(recv_buf, 0, sizeof(recv_buf));
     recv(sockfd, recv_buf, 1024, 0);
@@ -370,6 +395,7 @@ static struct text* recv_packet() {
     return (struct text *) recv_buf;
 }
 
+// receive the say text packet from the server and print its contents
 static void recv_say(struct text *recv_text) {
     struct text_say *say_text = (struct text_say *) recv_text;
     
@@ -383,6 +409,7 @@ static void recv_say(struct text *recv_text) {
     }
 }
 
+// receive the list text packet from the server and print its contents
 static void recv_list(struct text *recv_text) {
     struct text_list *list_text = (struct text_list *) recv_text;
     printf("Existing channels:\n");
@@ -392,6 +419,7 @@ static void recv_list(struct text *recv_text) {
     }
 }
 
+// receive the who text packet from the server and print its contents
 static void recv_who(struct text *recv_text) {
     struct text_who *who_text = (struct text_who *) recv_text;
     printf("Users on channel %s:\n", who_text->txt_channel);
@@ -401,6 +429,7 @@ static void recv_who(struct text *recv_text) {
     }
 }
 
+// receive the error text packet from the server and print its contents
 static void recv_error(struct text *recv_text) {
     struct text_error *error_text = (struct text_error *) recv_text;
     if (strlen(error_text->txt_error) <= SAY_MAX) 
