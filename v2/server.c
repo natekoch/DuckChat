@@ -276,6 +276,11 @@ void handle_logout_message(struct sockaddr_in sock)
     }
 	*/
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Logout";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
+
 	iter = rev_usernames.find(key);
 	if (iter == rev_usernames.end() )
 	{
@@ -330,11 +335,6 @@ void handle_logout_message(struct sockaddr_in sock)
 	//if so delete it and delete username from usernames
 	//if not send an error message - later
 
-    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-    string debug_details = "recv Request Logout";
-    string debug_msg = debug_ips + ' ' + debug_details;
-    cout << debug_msg << endl;
-
 }
 
 void handle_join_message(void *data, struct sockaddr_in sock)
@@ -356,7 +356,12 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
-	iter = rev_usernames.find(key);
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Join " + channel;
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
+	
+    iter = rev_usernames.find(key);
 	if (iter == rev_usernames.end() )
 	{
 		//ip+port not recognized - send an error message
@@ -404,10 +409,6 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 	//if channel is there add user to the channel
 	//if channel is not there add channel and add user to the channel
 
-    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-    string debug_details = "recv Request Join " + channel;
-    string debug_msg = debug_ips + ' ' + debug_details;
-    cout << debug_msg << endl;
 
 }
 
@@ -441,6 +442,10 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Leave " + channel;
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 
 	iter = rev_usernames.find(key);
 	if (iter == rev_usernames.end() )
@@ -496,10 +501,6 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 		}
 	}
 
-    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-    string debug_details = "recv Request Leave " + channel;
-    string debug_msg = debug_ips + ' ' + debug_details;
-    cout << debug_msg << endl;
   
 }
 
@@ -533,7 +534,12 @@ void handle_say_message(void *data, struct sockaddr_in sock)
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
-	iter = rev_usernames.find(key);
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Say " + channel + ' ' + '\"' + text + '\"';
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
+	
+    iter = rev_usernames.find(key);
 	if (iter == rev_usernames.end() )
 	{
 		//ip+port not recognized - send an error message
@@ -621,10 +627,6 @@ void handle_say_message(void *data, struct sockaddr_in sock)
 		}
 	}
 
-    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-    string debug_details = "recv Request Say " + channel + ' ' + '\"' + text + '\"';
-    string debug_msg = debug_ips + ' ' + debug_details;
-    cout << debug_msg << endl;
 }
 
 
@@ -646,6 +648,11 @@ void handle_list_message(struct sockaddr_in sock)
 
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
+    
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request List";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 
 	iter = rev_usernames.find(key);
 	if (iter == rev_usernames.end() )
@@ -718,10 +725,6 @@ void handle_list_message(struct sockaddr_in sock)
 
 	}
 
-    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-    string debug_details = "recv Request List";
-    string debug_msg = debug_ips + ' ' + debug_details;
-    cout << debug_msg << endl;
 }
 
 
@@ -752,6 +755,10 @@ void handle_who_message(void *data, struct sockaddr_in sock)
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Who ";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 
 	iter = rev_usernames.find(key);
 	if (iter == rev_usernames.end() )
@@ -841,10 +848,6 @@ void handle_who_message(void *data, struct sockaddr_in sock)
 		}
 	}
     
-    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-    string debug_details = "recv Request Who ";
-    string debug_msg = debug_ips + ' ' + debug_details;
-    cout << debug_msg << endl;
 }
 
 
@@ -866,6 +869,13 @@ void send_error_message(struct sockaddr_in sock, string error_msg)
 	len = sizeof send_msg;
 
 	struct sockaddr_in send_sock = sock;
+    
+	string ip = inet_ntoa(sock.sin_addr);
+
+	int port = sock.sin_port;
+
+ 	char port_str[6];
+ 	sprintf(port_str, "%d", port);
 
 	bytes = sendto(s, send_data, len, 0, (struct sockaddr*)&send_sock, sizeof send_sock);
 
@@ -879,4 +889,8 @@ void send_error_message(struct sockaddr_in sock, string error_msg)
 
 	}
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "send Text Error";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 }
