@@ -159,15 +159,15 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			int user_data = 0;
-			int server_data = 0;
+			//int user_data = 0;
+			//int server_data = 0;
 
-			if (FD_ISSET(STDIN,&fds))
+            if (FD_ISSET(STDIN,&fds))
 			{
 				//printf("stdin input available\n");
 				handle_user_input();
 				
-				user_data = 1;
+				//user_data = 1;
 
 			}
 
@@ -175,7 +175,8 @@ int main(int argc, char *argv[])
 			{
 				//printf("Getting server input\n");
 				handle_server_input();
-				server_data = 1;
+				
+                //server_data = 1;
 			}
 
 		

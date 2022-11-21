@@ -47,6 +47,8 @@ void handle_who_message(void *data, struct sockaddr_in sock);
 void handle_keep_alive_message(struct sockaddr_in sock);
 void send_error_message(struct sockaddr_in sock, string error_msg);
 
+string host_ip;
+
 
 
 int main(int argc, char *argv[])
@@ -54,7 +56,7 @@ int main(int argc, char *argv[])
 	
 	if (argc != 3)
 	{
-		printf("Usage: ./server domain_name port_num\n");
+		printf("Usage: ./server domain_name port_num [domain_name...] [port_num...]\n");
 		exit(1);
 	}
 
@@ -84,7 +86,10 @@ int main(int argc, char *argv[])
 	}
 	memcpy(&server.sin_addr, he->h_addr_list[0], he->h_length);
 
-	int err;
+	host_ip = host_ip + inet_ntoa(server.sin_addr);
+    host_ip = host_ip + ':' + argv[2];
+
+    int err;
 
 	err = bind(s, (struct sockaddr*)&server, sizeof server);
 
@@ -123,14 +128,14 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			int socket_data = 0;
+			//int socket_data = 0;
 
 			if (FD_ISSET(s,&fds))
 			{
                
 				//reading from socket
 				handle_socket_input();
-				socket_data = 1;
+				//socket_data = 1;
 
 			}
 		}	
@@ -238,11 +243,13 @@ void handle_login_message(void *data, struct sockaddr_in sock)
 	//cout << "key: " << key <<endl;
 	rev_usernames[key] = username;
 
-	cout << "server: " << username << " logs in" << endl;
+	//cout << "server: " << username << " logs in" << endl;
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Login";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 }
-
-
 
 void handle_logout_message(struct sockaddr_in sock)
 {
@@ -308,7 +315,7 @@ void handle_logout_message(struct sockaddr_in sock)
 		active_usernames.erase(active_user_iter);
 
 
-		cout << "server: " << username << " logs out" << endl;
+		//cout << "server: " << username << " logs out" << endl;
 	}
 
 
@@ -322,6 +329,11 @@ void handle_logout_message(struct sockaddr_in sock)
 
 	//if so delete it and delete username from usernames
 	//if not send an error message - later
+
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Logout";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 
 }
 
@@ -382,7 +394,7 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 
 		}
 
-		cout << "server: " << username << " joins channel " << channel << endl;
+		//cout << "server: " << username << " joins channel " << channel << endl;
 
 
 	}
@@ -392,6 +404,10 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 	//if channel is there add user to the channel
 	//if channel is not there add channel and add user to the channel
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Join " + channel;
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 
 }
 
@@ -446,7 +462,7 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 		{
 			//channel not found
 			send_error_message(sock, "No channel by the name " + channel);
-			cout << "server: " << username << " trying to leave non-existent channel " << channel << endl;
+			//cout << "server: " << username << " trying to leave non-existent channel " << channel << endl;
 
 		}
 		else
@@ -461,24 +477,30 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 			{
 				//user not in channel
 				send_error_message(sock, "You are not in channel " + channel);
-				cout << "server: " << username << " trying to leave channel " << channel  << " where he/she is not a member" << endl;
+				//cout << "server: " << username << " trying to leave channel " << channel  << " where he/she is not a member" << endl;
 			}
 			else
 			{
 				channels[channel].erase(channel_user_iter);
 				//existing_channel_users.erase(channel_user_iter);
-				cout << "server: " << username << " leaves channel " << channel <<endl;
+				//cout << "server: " << username << " leaves channel " << channel <<endl;
 
 				//delete channel if no more users
 				if (channels[channel].empty() && (channel != "Common"))
 				{
 					channels.erase(channel_iter);
-					cout << "server: " << "removing empty channel " << channel <<endl;
+					//cout << "server: " << "removing empty channel " << channel <<endl;
 				}
 
 			}
 		}
 	}
+
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Leave " + channel;
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
+  
 }
 
 
@@ -531,7 +553,7 @@ void handle_say_message(void *data, struct sockaddr_in sock)
 		{
 			//channel not found
 			send_error_message(sock, "No channel by the name " + channel);
-			cout << "server: " << username << " trying to send a message to non-existent channel " << channel << endl;
+			//cout << "server: " << username << " trying to send a message to non-existent channel " << channel << endl;
 
 		}
 		else
@@ -546,7 +568,7 @@ void handle_say_message(void *data, struct sockaddr_in sock)
 			{
 				//user not in channel
 				send_error_message(sock, "You are not in channel " + channel);
-				cout << "server: " << username << " trying to send a message to channel " << channel  << " where he/she is not a member" << endl;
+				//cout << "server: " << username << " trying to send a message to channel " << channel  << " where he/she is not a member" << endl;
 			}
 			else
 			{
@@ -593,11 +615,16 @@ void handle_say_message(void *data, struct sockaddr_in sock)
 					}
 
 				}
-				cout << "server: " << username << " sends say message in " << channel <<endl;
+				//cout << "server: " << username << " sends say message in " << channel <<endl;
 
 			}
 		}
 	}
+
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Say " + channel + ' ' + '\"' + text + '\"';
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 }
 
 
@@ -687,10 +714,14 @@ void handle_list_message(struct sockaddr_in sock)
 
 		}
 
-		cout << "server: " << username << " lists channels"<<endl;
+		//cout << "server: " << username << " lists channels"<<endl;
 
 	}
 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request List";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 }
 
 
@@ -742,7 +773,7 @@ void handle_who_message(void *data, struct sockaddr_in sock)
 		{
 			//channel not found
 			send_error_message(sock, "No channel by the name " + channel);
-			cout << "server: " << username << " trying to list users in non-existing channel " << channel << endl;
+			//cout << "server: " << username << " trying to list users in non-existing channel " << channel << endl;
 
 		}
 		else
@@ -805,10 +836,15 @@ void handle_who_message(void *data, struct sockaddr_in sock)
 
 			}
 
-			cout << "server: " << username << " lists users in channnel "<< channel << endl;
+			//cout << "server: " << username << " lists users in channnel "<< channel << endl;
 
 		}
 	}
+    
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv Request Who ";
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 }
 
 
