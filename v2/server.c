@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 	strcpy(hostname, argv[1]);
 	port = atoi(argv[2]);
 
-	// Keep track of the neighboring servers
+	// Keep track of the neighboring servers or topology
     if (argc > 3) {
         s2s_mode = 1;
         num_neighbors = (argc-3)/2;
