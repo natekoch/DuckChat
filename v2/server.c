@@ -36,6 +36,8 @@ map<string,int> active_usernames; //0-inactive , 1-active
 map<string,string> rev_usernames; //<ip+port in string, username>
 map<string,channel_type> channels;
 
+map<int,struct sockaddr_in> neighbors; //<server_num, sockaddr_in of server> 
+
 void handle_socket_input();
 void handle_login_message(void *data, struct sockaddr_in sock);
 void handle_logout_message(struct sockaddr_in sock);
@@ -47,14 +49,20 @@ void handle_who_message(void *data, struct sockaddr_in sock);
 void handle_keep_alive_message(struct sockaddr_in sock);
 void send_error_message(struct sockaddr_in sock, string error_msg);
 
+void send_S2S_join(string channel); // TODO send the join to all neighbors except for sender
+
+void handle_S2S_join(void *data, struct sockaddr_in sock); // TODO join the channel
+
+
 string host_ip;
 
-
+int s2s_mode = 0;
+int num_neighbors = 0;
 
 int main(int argc, char *argv[])
 {
 	
-	if (argc != 3)
+	if ((argc < 3) || !(argc % 2))
 	{
 		printf("Usage: ./server domain_name port_num [domain_name...] [port_num...]\n");
 		exit(1);
@@ -65,8 +73,30 @@ int main(int argc, char *argv[])
 	
 	strcpy(hostname, argv[1]);
 	port = atoi(argv[2]);
+
+	// Keep track of the neighboring servers
+    if (argc > 3) {
+        s2s_mode = 1;
+        num_neighbors = (argc-3)/2;
+        
+        struct hostent *s_he;
+        struct sockaddr_in neighbor_addr;
+        int index = 0;
+        
+        for (int i = 0; i <= num_neighbors; i+=2) {
+            neighbor_addr.sin_family = AF_INET;
+            neighbor_addr.sin_port = htons(atoi(argv[i+4]));
+            if ((s_he = gethostbyname(argv[i+3])) == NULL) {
+                puts("error resolving hostname...");
+                exit(1);
+            }
+            memcpy(&neighbor_addr.sin_addr, s_he->h_addr_list[0], s_he->h_length);
+            neighbors[index] = neighbor_addr;
+            index++;
+        }
+    }
 	
-	s = socket(PF_INET, SOCK_DGRAM, 0);
+    s = socket(PF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
 	{
 		perror ("socket() failed\n");
@@ -81,7 +111,7 @@ int main(int argc, char *argv[])
 	server.sin_port = htons(port);
 
 	if ((he = gethostbyname(hostname)) == NULL) {
-		puts("error resolving hostname..");
+		puts("error resolving hostname...");
 		exit(1);
 	}
 	memcpy(&server.sin_addr, he->h_addr_list[0], he->h_length);
@@ -109,7 +139,7 @@ int main(int argc, char *argv[])
 	map<string,struct sockaddr_in> default_channel_users;
 	channels[default_channel] = default_channel_users;
 
-	while(1) //server runs for ever
+	while(1) //server runs forever
 	{
 
 		//use a file descriptor with a timer to handle timeouts
@@ -118,7 +148,7 @@ int main(int argc, char *argv[])
 
 		FD_ZERO(&fds);
 		FD_SET(s, &fds);
-		
+		// TODO: ADD TIMEOUT TIMER
 		rc = select(s+1, &fds, NULL, NULL, NULL);
 		
 		if (rc < 0)

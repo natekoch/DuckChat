@@ -37,6 +37,11 @@ typedef int text_t;
 #define TXT_WHO 2
 #define TXT_ERROR 3
 
+/* Define codes for S2S types. These are the messages sent between the servers. */
+#define S2S_JOIN 8
+#define S2S_LEAVE 9
+#define S2S_SAY 10
+
 /* This structure is used for a generic request type, to the server. */
 struct request {
         request_t req_type;
@@ -83,6 +88,27 @@ struct request_who {
 struct request_keep_alive {
         request_t req_type; /* = REQ_KEEP_ALIVE */
 } packed;
+
+/* S2S types are just request types since the servers read them */
+
+struct s2s_join {
+    request_t req_type; /* = S2S_JOIN */
+    char req_channel[CHANNEL_MAX]; 
+} packed;
+
+struct s2s_leave {
+    request_t req_type; /* = S2S_LEAVE */
+    char req_channel[CHANNEL_MAX]; 
+} packed;
+
+struct s2s_say {
+    request req_type; /* = S2S_SAY */
+    unsigned int unique_id; 
+    char req_username[USERNAME_MAX];
+    char req_channel[CHANNEL_MAX];
+    char req_text[SAY_MAX];
+} packed;
+
 
 /* This structure is used for a generic text type, to the client. */
 struct text {
