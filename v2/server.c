@@ -235,7 +235,10 @@ void handle_socket_input()
 		{
 			handle_who_message(data, recv_client);
 		}
-		
+		else if (message_type == S2S_JOIN)
+		{
+			handle_S2S_join(data, recv_client);
+		} 
 		else
 		{
 			//send error message to client
@@ -923,4 +926,29 @@ void send_error_message(struct sockaddr_in sock, string error_msg)
     string debug_details = "send Text Error";
     string debug_msg = debug_ips + ' ' + debug_details;
     cout << debug_msg << endl;
+}
+
+// TODO
+void send_S2S_join(string channel) 
+{
+	ssize_t bytes;
+	void *send_data;
+	size_t len;
+
+	struct s2s_join send_msg;
+	send_msg.req_type = S2S_JOIN;
+
+	// TODO WIP
+	map<int,struct sockaddr_in>::iterator neighbors_iter;
+	for(neighbors_iter = neighbors.begin(); neighbors_iter != neighbors.end(); neighbors_iter++)
+	{
+		cout << neighbors_iter->second << endl;
+	}
+
+}
+
+// TODO
+void handle_S2S_join(void *data, struct sockaddr_in sock) 
+{
+	printf("GOTCHA\n");
 }
