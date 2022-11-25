@@ -36,7 +36,13 @@ map<string,int> active_usernames; //0-inactive , 1-active
 map<string,string> rev_usernames; //<ip+port in string, username>
 map<string,channel_type> channels;
 
-map<int,struct sockaddr_in> neighbors; //<server_num, sockaddr_in of server> 
+
+// TODO channel topology storage
+typedef map<int,struct sockaddr_in> routing_table;
+
+routing_table neighbors; //<server_num, sockaddr_in of server>
+
+map<string, routing_table> channel_tables; // <channel_name, channel_neighbors> hold the channel topologies
 
 void handle_socket_input();
 void handle_login_message(void *data, struct sockaddr_in sock);
@@ -49,7 +55,8 @@ void handle_who_message(void *data, struct sockaddr_in sock);
 void handle_keep_alive_message(struct sockaddr_in sock);
 void send_error_message(struct sockaddr_in sock, string error_msg);
 
-void send_S2S_join(string channel); // TODO send the join to all neighbors except for sender
+void send_joins(string channel, struct sockaddr_in sender);
+void send_S2S_join(struct sockaddr_in sock, string channel); // TODO send the join to all neighbors except for sender
 
 void handle_S2S_join(void *data, struct sockaddr_in sock); // TODO join the channel
 
@@ -64,7 +71,7 @@ int main(int argc, char *argv[])
 	
 	if ((argc < 3) || !(argc % 2))
 	{
-		printf("Usage: ./server domain_name port_num [domain_name...] [port_num...]\n");
+		printf("Usage: ./server domain_name port_num [domain_name port_num...]\n");
 		exit(1);
 	}
 
@@ -83,7 +90,7 @@ int main(int argc, char *argv[])
         struct sockaddr_in neighbor_addr;
         int index = 0;
         
-        for (int i = 0; i <= num_neighbors; i+=2) {
+        for (int i = 0; index < num_neighbors; i+=2) {
             neighbor_addr.sin_family = AF_INET;
             neighbor_addr.sin_port = htons(atoi(argv[i+4]));
             if ((s_he = gethostbyname(argv[i+3])) == NULL) {
@@ -95,7 +102,13 @@ int main(int argc, char *argv[])
             index++;
         }
     }
-	
+    /*
+    cout << "NUM: " <<  num_neighbors << endl;
+    for (int i = 0; i < num_neighbors; i++) {
+        cout << port <<  " ";
+        cout << ntohs(neighbors[i].sin_port) << endl;
+    }
+	*/
     s = socket(PF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
 	{
@@ -138,8 +151,10 @@ int main(int argc, char *argv[])
 	string default_channel = "Common";
 	map<string,struct sockaddr_in> default_channel_users;
 	channels[default_channel] = default_channel_users;
-
-	while(1) //server runs forever
+    // TODO check
+    if (s2s_mode) channel_tables[default_channel] = neighbors;
+	
+    while(1) //server runs forever
 	{
 
 		//use a file descriptor with a timer to handle timeouts
@@ -276,6 +291,8 @@ void handle_login_message(void *data, struct sockaddr_in sock)
 	//cout << "key: " << key <<endl;
 	rev_usernames[key] = username;
 
+    sprintf(port_str, "%d", ntohs(port));
+
 	//cout << "server: " << username << " logs in" << endl;
 
     string debug_ips = host_ip + ' ' + ip + ':' + port_str;
@@ -299,7 +316,9 @@ void handle_logout_message(struct sockaddr_in sock)
 	string key = ip + "." +port_str;
 	//cout << "key: " << key <<endl;
 
-	//check whether key is in rev_usernames
+    sprintf(port_str, "%d", ntohs(port));
+	
+    //check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
 	/*
@@ -386,6 +405,8 @@ void handle_join_message(void *data, struct sockaddr_in sock)
  	sprintf(port_str, "%d", port);
 	string key = ip + "." +port_str;
 
+    sprintf(port_str, "%d", ntohs(port));
+	
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
@@ -416,6 +437,9 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 			map<string,struct sockaddr_in> new_channel_users;
 			new_channel_users[username] = sock;
 			channels[channel] = new_channel_users;
+
+            // TODO
+            if (s2s_mode) channel_tables[channel] = neighbors;
 			//cout << "creating new channel and joining" << endl;
 
 		}
@@ -433,8 +457,8 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 		}
 
 		//cout << "server: " << username << " joins channel " << channel << endl;
-
-
+        // TODO send s2s_join to all neighbors
+        if (s2s_mode) send_joins(channel, sock);    
 	}
 
 	//check whether the user is in usernames
@@ -471,6 +495,8 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
  	sprintf(port_str, "%d", port);
 	string key = ip + "." +port_str;
 
+    sprintf(port_str, "%d", ntohs(port));
+	
 
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
@@ -564,6 +590,8 @@ void handle_say_message(void *data, struct sockaddr_in sock)
  	sprintf(port_str, "%d", port);
 	string key = ip + "." +port_str;
 
+    sprintf(port_str, "%d", ntohs(port));
+	
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
 
@@ -679,6 +707,8 @@ void handle_list_message(struct sockaddr_in sock)
  	sprintf(port_str, "%d", port);
 	string key = ip + "." +port_str;
 
+    sprintf(port_str, "%d", ntohs(port));
+	
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
     
@@ -784,6 +814,8 @@ void handle_who_message(void *data, struct sockaddr_in sock)
  	sprintf(port_str, "%d", port);
 	string key = ip + "." +port_str;
 
+    sprintf(port_str, "%d", ntohs(port));
+	
 
 	//check whether key is in rev_usernames
 	map <string,string> :: iterator iter;
@@ -908,7 +940,7 @@ void send_error_message(struct sockaddr_in sock, string error_msg)
 	int port = sock.sin_port;
 
  	char port_str[6];
- 	sprintf(port_str, "%d", port);
+ 	sprintf(port_str, "%d", ntohs(port));
 
 	bytes = sendto(s, send_data, len, 0, (struct sockaddr*)&send_sock, sizeof send_sock);
 
@@ -929,26 +961,87 @@ void send_error_message(struct sockaddr_in sock, string error_msg)
 }
 
 // TODO
-void send_S2S_join(string channel) 
+void send_S2S_join(struct sockaddr_in sock, string channel) 
 {
 	ssize_t bytes;
 	void *send_data;
-	size_t len;
+    size_t len;
 
 	struct s2s_join send_msg;
 	send_msg.req_type = S2S_JOIN;
+    strcpy(send_msg.req_channel, channel.c_str());
 
-	// TODO WIP
-	map<int,struct sockaddr_in>::iterator neighbors_iter;
-	for(neighbors_iter = neighbors.begin(); neighbors_iter != neighbors.end(); neighbors_iter++)
-	{
-		cout << neighbors_iter->second << endl;
+	send_data = &send_msg;
+
+    len = sizeof send_msg;
+
+	struct sockaddr_in send_sock = sock;
+    
+    string ip = inet_ntoa(sock.sin_addr);
+
+ 	char port_str[6];
+ 	sprintf(port_str, "%d", ntohs(sock.sin_port));
+    
+    bytes = sendto(s, send_data, len, 0, (struct sockaddr*)&send_sock, sizeof send_sock);
+
+	if (bytes < 0)
+    {
+	    perror("Message failed\n"); //error
+    }
+	else
+    {
+	    //printf("Message sent\n");
 	}
+ 
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "send S2S Join " + channel;
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
 
 }
+
+
+
+void send_joins(string channel, struct sockaddr_in sender)
+{
+    // look up if channel is subscribed to
+    //if (channel_tables.find(channel) != channel_tables.end()) {
+        // iter through routing table for channel
+        for (routing_table::iterator iter = channel_tables[channel].begin(); iter != channel_tables[channel].end(); iter++) 
+        {
+            if (!(iter->second.sin_addr.s_addr == sender.sin_addr.s_addr && 
+                iter->second.sin_port == sender.sin_port)) 
+                send_S2S_join(iter->second, channel);
+        }
+
+    //}
+}
+
+
 
 // TODO
 void handle_S2S_join(void *data, struct sockaddr_in sock) 
 {
-	printf("GOTCHA\n");
+    (void) sock; // TODO see if join shouldn't be sent back to the server that sent it
+    struct s2s_join* msg; 
+    msg = (struct s2s_join*) data; 
+
+    string channel = msg->req_channel;
+ 
+    string ip = inet_ntoa(sock.sin_addr);
+
+ 	char port_str[6];
+ 	sprintf(port_str, "%d", ntohs(sock.sin_port));
+    
+    string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+    string debug_details = "recv S2S Join " + channel;
+    string debug_msg = debug_ips + ' ' + debug_details;
+    cout << debug_msg << endl;
+
+    if (channel_tables.find(channel) == channel_tables.end())
+    {
+        channel_tables[channel] = neighbors;
+    }
+    send_joins(channel, sock);
 }
+
