@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/random.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -45,7 +46,7 @@ routing_table neighbors; //<server_num, sockaddr_in of server>
 
 map<string, routing_table> channel_tables; // <channel_name, channel_neighbors> hold the channel topologies
 
-map<int,int> message_ids;  // 0-unseen, 1-seen
+map<unsigned long,int> message_ids;  // 0-unseen, 1-seen
 
 void handle_socket_input();
 void handle_login_message(void *data, struct sockaddr_in sock);
@@ -58,14 +59,13 @@ void handle_who_message(void *data, struct sockaddr_in sock);
 void handle_keep_alive_message(struct sockaddr_in sock);
 void send_error_message(struct sockaddr_in sock, string error_msg);
 
-void send_joins(string channel, struct sockaddr_in sender);
-void send_S2S_join(struct sockaddr_in sock, string channel); // TODO send the join to all neighbors except for sender
-void handle_S2S_join(void *data, struct sockaddr_in sock); // TODO join the channel
+void send_S2S_join(struct sockaddr_in sock, string channel);
+void handle_S2S_join(void *data, struct sockaddr_in sock); 
 
 void send_S2S_leave(struct sockaddr_in sock, string channel); // TODO
 void handle_S2S_leave(void *data, struct sockaddr_in sock);
 
-void send_S2S_say(struct sockaddr_in sock, string channel, string text);
+void send_S2S_say(struct sockaddr_in sock, unsigned long unique_id, string username, string channel, string text);
 void handle_S2S_say(void *data, struct sockaddr_in sock);
 
 string host_ip;
@@ -260,7 +260,11 @@ void handle_socket_input()
 		else if (message_type == S2S_JOIN)
 		{
 			handle_S2S_join(data, recv_client);
-		} 
+		}
+        else if (message_type == S2S_SAY)
+        {
+            handle_S2S_say(data, recv_client);
+        }
 		else
 		{
 			//send error message to client
@@ -465,7 +469,7 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 
 		//cout << "server: " << username << " joins channel " << channel << endl;
         // TODO send s2s_join to all neighbors
-        if (s2s_mode) send_joins(sock, channel);    
+        if (s2s_mode) send_S2S_join(sock, channel);    
 	}
 
 	//check whether the user is in usernames
@@ -690,8 +694,17 @@ void handle_say_message(void *data, struct sockaddr_in sock)
 
 				}
 				//cout << "server: " << username << " sends say message in " << channel <<endl;
+                if (s2s_mode)
+                {
+                    // TODO send message to other servers in routing table
+	                // TODO create 64-bit unique id 
+                    unsigned long unique_id;
+                    getrandom(&unique_id, sizeof(unsigned long), 0);
 
-			}
+                    message_ids[unique_id] = 1;
+                    send_S2S_say(sock, unique_id, username, channel, text);
+			    }
+            }
 		}
 	}
 
@@ -1045,7 +1058,7 @@ void handle_S2S_join(void *data, struct sockaddr_in sock)
 }
 
 
-
+/*
 void send_S2S_leave(struct sockaddr_in sock, string channel)
 {
 	// create packet send to sock
@@ -1066,10 +1079,10 @@ void handle_S2S_leave(void *data, struct sockaddr_in sock)
 
 	// print debug recv line 
 }
+*/
 
 
-
-void send_S2S_say(struct sockaddr_in sender, string username, string channel, string text) 
+void send_S2S_say(struct sockaddr_in sender, unsigned long unique_id, string username, string channel, string text) 
 {	
 	// create packet 
 	ssize_t bytes;
@@ -1078,15 +1091,9 @@ void send_S2S_say(struct sockaddr_in sender, string username, string channel, st
 
 	struct s2s_say send_msg;
 
-	// create 64-bit unique id
-	unsigned char unique_id[8];
-	int fd = open("/dev/urandom", O_RDONLY);
-	read(fd, unique_id, 8);
-	close(fd);
-
-	message_ids[unique_id] = 1;
 
 	send_msg.req_type = S2S_SAY;
+    send_msg.unique_id = unique_id;
 	strcpy(send_msg.req_username, username.c_str());
     strcpy(send_msg.req_channel, channel.c_str());
 	strcpy(send_msg.req_text, text.c_str());
@@ -1122,14 +1129,11 @@ void send_S2S_say(struct sockaddr_in sender, string username, string channel, st
 		
 			// print debug send line
 			string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-			string debug_details = "send S2S Say " + username + channel + "\"" + text + "\"";
+			string debug_details = "send S2S Say " + username + " "  + channel + " \"" + text + "\"";
 			string debug_msg = debug_ips + ' ' + debug_details;
 			cout << debug_msg << endl;
 		}
-	}	
-	
-	printf("%X" unique_id);
-	
+	}		
 }
 
 
@@ -1143,7 +1147,7 @@ void handle_S2S_say(void *data, struct sockaddr_in sock)
 
 	struct s2s_say* msg; 
     msg = (struct s2s_say*) data; 
-
+    //print("%X", msg->unique_id*);
 	if (!message_ids[msg->unique_id])  
 	{
 		message_ids[msg->unique_id] = 1;
@@ -1159,15 +1163,54 @@ void handle_S2S_say(void *data, struct sockaddr_in sock)
 		
 		// print debug recv line
 		string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-		string debug_details = "recv S2S Say " + username + channel + "\"" + text + "\"";
+		string debug_details = "recv S2S Say " + username + " " + channel + " \"" + text + "\"";
 		string debug_msg = debug_ips + ' ' + debug_details;
 		cout << debug_msg << endl;
 		
 		// forward the message to routing table
-		send_S2S_say(sock, username, channel, text);
+		send_S2S_say(sock, msg->unique_id, username, channel, text);
 
-		// TODO: send message to users subscribed to channel on this server.
+		// TODO: send message to users subscribed to channel on this server
+        map<string, struct sockaddr_in>::iterator channel_user_iter;
+        
+        map<string, struct sockaddr_in> existing_channel_users;
+        existing_channel_users = channels[channel];
+        if (!existing_channel_users.empty())
+        {
+            for (channel_user_iter = existing_channel_users.begin(); channel_user_iter != existing_channel_users.end(); channel_user_iter++) 
+            {
+                ssize_t bytes;
+                void *send_data;
+                size_t len;
 
+                struct text_say send_msg;
+                send_msg.txt_type = TXT_SAY;
+
+                const char* str = channel.c_str();
+                strcpy(send_msg.txt_channel, str);
+                str = username.c_str();
+                strcpy(send_msg.txt_username, str);
+                str = text.c_str();
+                strcpy(send_msg.txt_text, str);
+
+                send_data = &send_msg;
+
+                len = sizeof send_msg;
+
+                struct sockaddr_in send_sock = channel_user_iter->second;
+
+                bytes = sendto(s, send_data, len, 0, (struct sockaddr*)&send_sock, sizeof send_sock);
+
+                if (bytes < 0)
+                {
+                    perror("Message failed\n");
+                }
+            }
+        }
+        else
+        {
+            // TODO no users to forward to need to leave
+        }
 	}
 	 
 }

@@ -102,8 +102,8 @@ struct s2s_leave {
 } packed;
 
 struct s2s_say {
-    request req_type; /* = S2S_SAY */
-    unsigned int unique_id; 
+    request_t req_type; /* = S2S_SAY */
+    unsigned long unique_id; 
     char req_username[USERNAME_MAX];
     char req_channel[CHANNEL_MAX];
     char req_text[SAY_MAX];
