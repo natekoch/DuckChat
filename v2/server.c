@@ -917,12 +917,13 @@ void handle_S2S_join(void *data, struct sockaddr_in sock)
     if (channel_tables.find(channel) == channel_tables.end())
     {
         channel_tables[channel] = neighbors;
+		// only forward a join if not already apart of the channel
+		send_S2S_join(sock, channel);
     }
 	else
 	{
         channel_tables[channel][ip_port] = sock;
-	}
-    send_S2S_join(sock, channel);
+	}  
 
 	// TODO reset the timer for the renewed server
 }
