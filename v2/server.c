@@ -35,7 +35,6 @@ map<string,int> active_usernames; //0-inactive , 1-active
 map<string,string> rev_usernames; //<ip+port in string, username>
 map<string,channel_type> channels;
 
-
 // channel topology storage
 typedef map<string,struct sockaddr_in> routing_table; // <ip+port in string, sockaddr_in>
 
@@ -104,9 +103,9 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             memcpy(&neighbor_addr.sin_addr, s_he->h_addr_list[0], s_he->h_length);
-			string ip_port = ip_port + inet_ntoa(neighbor_addr.sin_addr);
-    		ip_port = ip_port + ':';
-            ip_port = ip_port + to_string(ntohs(neighbor_addr.sin_port));
+			string ip_port = inet_ntoa(neighbor_addr.sin_addr) + ':' + to_string(ntohs(neighbor_addr.sin_port)); 
+            //ip_port = ip_port + ':';
+            //ip_port = ip_port + to_string(ntohs(neighbor_addr.sin_port));
             neighbors[ip_port] = neighbor_addr;
             ip_port = "";
             index++;
@@ -149,7 +148,7 @@ int main(int argc, char *argv[])
 	string default_channel = "Common";
 	map<string,struct sockaddr_in> default_channel_users;
 	channels[default_channel] = default_channel_users;
-    if (s2s_mode) channel_tables[default_channel] = neighbors;
+    //if (s2s_mode) channel_tables[default_channel] = neighbors;
 	
     while(1) //server runs forever
 	{
@@ -403,19 +402,28 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 			map<string,struct sockaddr_in> new_channel_users;
 			new_channel_users[username] = sock;
 			channels[channel] = new_channel_users;
-
-            if (s2s_mode) channel_tables[channel] = neighbors;
+            
+            // TODO 
+            /*
+            // send s2s_join to all neighbors
+            if (s2s_mode) 
+            {
+                channel_tables[channel] = neighbors;
+                //send_S2S_join(sock, channel);
+            }
+            */
 		}
 		else
 		{
 			//channel already exits
 			channels[channel][username] = sock;
 		}
-        // send s2s_join to all neighbors
+        
         if (s2s_mode) 
         {
             if (server_channel_iter == channel_tables.end())
             {    
+                cout<<"hi"<<endl;
                 channel_tables[channel] = neighbors;
                 send_S2S_join(sock, channel); 
             }
@@ -501,8 +509,9 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 					channels.erase(channel_iter);
 				}
 
-			}
-		}
+			    // TODO update the server topology
+            }
+        }
 	}
 }
 
@@ -813,8 +822,9 @@ void send_error_message(struct sockaddr_in sock, string error_msg)
 	size_t len;
 
 	struct text_error send_msg;
-	send_msg.txt_type = TXT_ERROR;
-
+	memset(&send_msg, 0, sizeof(send_msg));
+    send_msg.txt_type = TXT_ERROR;
+    
 	const char* str = error_msg.c_str();
 	strcpy(send_msg.txt_error, str);
 
@@ -853,7 +863,8 @@ void send_S2S_join(struct sockaddr_in sender, string channel)
     size_t len;
 
 	struct s2s_join send_msg;
-	send_msg.req_type = S2S_JOIN;
+    memset(&send_msg, 0, sizeof(send_msg));
+    send_msg.req_type = S2S_JOIN;
     strcpy(send_msg.req_channel, channel.c_str());
 
 	send_data = &send_msg;
@@ -907,7 +918,7 @@ void handle_S2S_join(void *data, struct sockaddr_in sock)
  	char port_str[6];
  	sprintf(port_str, "%d", ntohs(sock.sin_port));
     
-    string ip_port = ip_port + ip + ":" + port_str;
+    string ip_port = ip + ":" + port_str;
 
     string debug_ips = host_ip + ' ' + ip + ':' + port_str;
     string debug_details = "recv S2S Join " + channel;
@@ -938,6 +949,7 @@ void send_S2S_leave(struct sockaddr_in sock, string channel)
     size_t len;
 
 	struct s2s_leave send_msg;
+    memset(&send_msg, 0, sizeof(send_msg));
 	send_msg.req_type = S2S_LEAVE;
     strcpy(send_msg.req_channel, channel.c_str());
 
@@ -954,7 +966,6 @@ void send_S2S_leave(struct sockaddr_in sock, string channel)
 
 	if (bytes < 0)
 	{
-        cout<<host_ip<<" failure"<<endl;
 		perror("Message failed\n"); //error
 	}
 
@@ -1018,6 +1029,7 @@ void send_S2S_say(struct sockaddr_in sender, unsigned long unique_id, string use
     size_t len;
 
 	struct s2s_say send_msg;
+    memset(&send_msg, 0, sizeof(send_msg));
 
 	send_msg.req_type = S2S_SAY;
     send_msg.unique_id = unique_id;
@@ -1072,24 +1084,25 @@ void handle_S2S_say(void *data, struct sockaddr_in sock)
     msg = (struct s2s_say*) data; 
     
     string channel = msg->req_channel;
+	string username = msg->req_username;
+	string text = msg->req_text;
+
+    string ip = inet_ntoa(sock.sin_addr);
+
+    char port_str[6];
+	sprintf(port_str, "%d", ntohs(sock.sin_port));
+
+    string ip_port = ip + ":" + port_str;
 	
+    // print debug recv line
+	string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+	string debug_details = "recv S2S Say " + username + " " + channel + " \"" + text + "\"";
+	string debug_msg = debug_ips + ' ' + debug_details;
+	cout << debug_msg << endl;
+
     if (!message_ids[msg->unique_id])  
 	{
 		message_ids[msg->unique_id] = 1;
-
-		string username = msg->req_username;
-		string text = msg->req_text;
-
-		string ip = inet_ntoa(sock.sin_addr);
-
-		char port_str[6];
-		sprintf(port_str, "%d", ntohs(sock.sin_port));
-		
-		// print debug recv line
-		string debug_ips = host_ip + ' ' + ip + ':' + port_str;
-		string debug_details = "recv S2S Say " + username + " " + channel + " \"" + text + "\"";
-		string debug_msg = debug_ips + ' ' + debug_details;
-		cout << debug_msg << endl;
 		
 		// forward the message to routing table
 		send_S2S_say(sock, msg->unique_id, username, channel, text);
@@ -1108,6 +1121,8 @@ void handle_S2S_say(void *data, struct sockaddr_in sock)
                 size_t len;
 
                 struct text_say send_msg;
+                memset(&send_msg, 0, sizeof(send_msg));
+                
                 send_msg.txt_type = TXT_SAY;
 
                 const char* str = channel.c_str();
@@ -1134,7 +1149,7 @@ void handle_S2S_say(void *data, struct sockaddr_in sock)
         else
         {
             // no users to forward to need to leave if no other servers rely on connection
-			if  (is_leaf || (channel_tables[channel]).size() == 1) 
+			if  (is_leaf || ((channel_tables[channel]).size() == 1)) 
 			{ 
 				// erase the entry at channel
 				channel_tables.erase(channel);
@@ -1144,9 +1159,10 @@ void handle_S2S_say(void *data, struct sockaddr_in sock)
 	}
 	else
 	{
-		// Duplicate message received send a leave request 
-		// to the sender to break the loop.
-		send_S2S_leave(sock, channel);
+		// Duplicate message received
+        // remove sender from routing table
+        channel_tables[channel].erase(ip_port);
+        // send a leave request to the sender to break the loop.
+        send_S2S_leave(sock, channel);
 	}
-	 
 }
