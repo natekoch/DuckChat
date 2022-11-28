@@ -38,7 +38,7 @@ map<string,channel_type> channels;
 // channel topology storage
 typedef map<string,struct sockaddr_in> routing_table; // <ip+port in string, sockaddr_in>
 
-routing_table neighbors; //<server_num, sockaddr_in of server>
+routing_table neighbors; //<ip+port in stringm, sockaddr_in of server>
 
 map<string, routing_table> channel_tables; // <channel_name, channel_neighbors> hold the channel topologies
 
@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
         struct hostent *s_he;
         struct sockaddr_in neighbor_addr;
         int index = 0;
-
+        string ip_port;
         for (int i = 0; index < num_neighbors; i+=2) {
             neighbor_addr.sin_family = AF_INET;
             neighbor_addr.sin_port = htons(atoi(argv[i+4]));
@@ -103,9 +103,8 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             memcpy(&neighbor_addr.sin_addr, s_he->h_addr_list[0], s_he->h_length);
-			string ip_port = inet_ntoa(neighbor_addr.sin_addr) + ':' + to_string(ntohs(neighbor_addr.sin_port)); 
-            //ip_port = ip_port + ':';
-            //ip_port = ip_port + to_string(ntohs(neighbor_addr.sin_port));
+			ip_port = ip_port + inet_ntoa(neighbor_addr.sin_addr);
+            ip_port = ip_port + ":" +to_string(ntohs(neighbor_addr.sin_port)); 
             neighbors[ip_port] = neighbor_addr;
             ip_port = "";
             index++;
@@ -132,7 +131,6 @@ int main(int argc, char *argv[])
 
 	host_ip = host_ip + inet_ntoa(server.sin_addr);
     host_ip = host_ip + ':' + argv[2];
-
     int err;
 
 	err = bind(s, (struct sockaddr*)&server, sizeof server);
@@ -423,7 +421,6 @@ void handle_join_message(void *data, struct sockaddr_in sock)
         {
             if (server_channel_iter == channel_tables.end())
             {    
-                cout<<"hi"<<endl;
                 channel_tables[channel] = neighbors;
                 send_S2S_join(sock, channel); 
             }
@@ -510,6 +507,7 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 				}
 
 			    // TODO update the server topology
+
             }
         }
 	}
@@ -999,6 +997,9 @@ void handle_S2S_leave(void *data, struct sockaddr_in sock)
 	// remove the sending sock from the routing table
 	string ip_port = ip + ":"; 
 	ip_port = ip_port + port_str;
+    // JMP
+    cout<<channel_tables[channel][ip_port].sin_port<<endl;
+    cout<<"REMOVED SERVER "<<ip_port<<endl;
 	channel_tables[channel].erase(ip_port);
     
 	// check if this server needs to leave as well
