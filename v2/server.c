@@ -111,6 +111,20 @@ int main(int argc, char *argv[])
         }
     }
 
+	// TODO timer
+	struct itimerval refresh_time;
+
+	if (signal(SIGALRM, refresh_time) == SIG_ERR) \
+	{
+		perror("SIGALRM failed\n");
+	}
+	refresh_time.it_value = {60, 0};
+	refresh_time.it_interval = refresh_time.it_value;
+	if (setitimer(ITIMER_REAL, &refresh_time, NULL) == -1)
+	{
+		perror("setitimer() failed\n");
+	}
+
     s = socket(PF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
 	{
@@ -176,6 +190,16 @@ int main(int argc, char *argv[])
 		}	
 	}
 	return 0;
+}
+
+
+
+void refresh_connections(int signum) 
+{
+	// TODO
+	(void) signum;
+	//every other sigalrm check for unrefreshed servers
+	cout<<"RECEIVED SIGALRM"<<endl;
 }
 
 
