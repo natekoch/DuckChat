@@ -16,6 +16,7 @@
 #include <map>
 #include <iostream>
 #include <time.h>
+#include <signal.h>
 
 using namespace std;
 
@@ -44,6 +45,10 @@ map<string, routing_table> channel_tables; // <channel_name, channel_neighbors> 
 
 map<unsigned long,int> message_ids;  // 0-unseen, 1-seen
 
+map<string,time_t> refreshed;// <ip+port in string, time_t last refreshed>
+
+void refresh_connections(int signum);
+
 void handle_socket_input();
 void handle_login_message(void *data, struct sockaddr_in sock);
 void handle_logout_message(struct sockaddr_in sock);
@@ -69,6 +74,8 @@ string host_ip;
 int s2s_mode = 0;
 int num_neighbors = 0;
 int is_leaf = 0;
+
+int timeout_check = 0;
 
 int main(int argc, char *argv[])
 {
@@ -111,10 +118,9 @@ int main(int argc, char *argv[])
         }
     }
 
-	// TODO timer
 	struct itimerval refresh_time;
 
-	if (signal(SIGALRM, refresh_time) == SIG_ERR) \
+	if (signal(SIGALRM, refresh_connections) == SIG_ERR) \
 	{
 		perror("SIGALRM failed\n");
 	}
@@ -160,23 +166,19 @@ int main(int argc, char *argv[])
 	string default_channel = "Common";
 	map<string,struct sockaddr_in> default_channel_users;
 	channels[default_channel] = default_channel_users;
-    //if (s2s_mode) channel_tables[default_channel] = neighbors;
 	
     while(1) //server runs forever
 	{
-
-		//use a file descriptor with a timer to handle timeouts
 		int rc;
 		fd_set fds;
 
 		FD_ZERO(&fds);
 		FD_SET(s, &fds);
-		// TODO: ADD TIMEOUT TIMER
 		rc = select(s+1, &fds, NULL, NULL, NULL);
 		
 		if (rc < 0)
 		{
-			printf("error in select\n");
+			//printf("error in select\n");
             getchar();
 		}
 		else
@@ -196,10 +198,85 @@ int main(int argc, char *argv[])
 
 void refresh_connections(int signum) 
 {
-	// TODO
 	(void) signum;
-	//every other sigalrm check for unrefreshed servers
-	cout<<"RECEIVED SIGALRM"<<endl;
+
+    // send_S2S_join for  all channels to all neighbors.
+    
+	ssize_t bytes;
+	void *send_data;
+    size_t len;
+
+	struct s2s_join send_msg;
+    memset(&send_msg, 0, sizeof(send_msg));
+    send_msg.req_type = S2S_JOIN;
+
+	send_data = &send_msg;
+
+    len = sizeof send_msg;
+
+    char port_str[6];
+	
+    struct sockaddr_in send_sock;
+    
+    map<string,channel_type>::iterator channel_iter;
+    routing_table::iterator neighbor_iter;
+    for (channel_iter = channels.begin(); channel_iter != channels.end(); channel_iter++) 
+    {
+        for (neighbor_iter = neighbors.begin(); neighbor_iter != neighbors.end(); neighbor_iter++)
+        {
+			send_sock = neighbor_iter->second;
+
+			string ip = inet_ntoa(send_sock.sin_addr);
+
+			sprintf(port_str, "%d", ntohs(send_sock.sin_port));
+
+            strcpy(send_msg.req_channel, channel_iter->first.c_str());
+			
+            bytes = sendto(s, send_data, len, 0, (struct sockaddr*)&send_sock, sizeof send_sock);
+
+			if (bytes < 0)
+			{
+				perror("Message failed\n"); //error
+			}
+		
+			string debug_ips = host_ip + ' ' + ip + ':' + port_str;
+			string debug_details = "send S2S Join " + channel_iter->first;
+			string debug_msg = debug_ips + ' ' + debug_details;
+			cout << debug_msg << endl;
+
+        }
+    }
+
+    // update timeout_check
+    if (timeout_check)
+    {
+        // check all to see if server hasn't refreshed
+        // remove unrefreshed server
+        timeout_check = 0;
+        map<string, time_t>::iterator iter;
+        for (iter = refreshed.begin(); iter != refreshed.end(); iter++)
+        {
+            time_t curr_time;
+            time(&curr_time);
+            if (difftime(curr_time, iter->second) > 120) 
+            {
+                // remove server from routing table
+                neighbors.erase(iter->first);
+                // remove from all channels
+                for (channel_iter = channels.begin(); channel_iter != channels.end(); channel_iter++) 
+                {
+                    channel_tables[channel_iter->first].erase(iter->first);
+                }
+                refreshed.erase(iter->first);
+                cout<<iter->first<<" timed out."<<endl;
+            }
+        }
+    }
+    else
+    {
+        // check the servers refreshed times next cycle sigalrm
+        timeout_check = 1;
+    }
 }
 
 
@@ -424,16 +501,6 @@ void handle_join_message(void *data, struct sockaddr_in sock)
 			map<string,struct sockaddr_in> new_channel_users;
 			new_channel_users[username] = sock;
 			channels[channel] = new_channel_users;
-            
-            // TODO 
-            /*
-            // send s2s_join to all neighbors
-            if (s2s_mode) 
-            {
-                channel_tables[channel] = neighbors;
-                //send_S2S_join(sock, channel);
-            }
-            */
 		}
 		else
 		{
@@ -530,8 +597,20 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 					channels.erase(channel_iter);
 				}
 
-			    // TODO update the server topology
-
+			    // update the server topology
+                if (s2s_mode) { 
+                    // check if any servers rely on this server
+		            if  (is_leaf || (channel_tables[channel]).size() == 1) 
+		            {            
+			            if (!channel_tables.empty()) 
+                        {
+                            // send a leave if not to the above
+			                send_S2S_leave(channel_tables[channel].begin()->second, channel);
+			            }
+                        // erase the entry at channel
+			            channel_tables.erase(channel);
+		            }
+                }
             }
         }
 	}
@@ -913,10 +992,6 @@ void send_S2S_join(struct sockaddr_in sender, string channel)
 			{
 				perror("Message failed\n"); //error
 			}
-			else
-			{
-				//printf("Message sent\n");
-			}
 		
 			string debug_ips = host_ip + ' ' + ip + ':' + port_str;
 			string debug_details = "send S2S Join " + channel;
@@ -958,7 +1033,8 @@ void handle_S2S_join(void *data, struct sockaddr_in sock)
         channel_tables[channel][ip_port] = sock;
 	}  
 
-	// TODO reset the timer for the renewed server
+	// reset the timer for the renewed server
+    time(&(refreshed[ip_port]));
 }
 
 
@@ -1021,9 +1097,6 @@ void handle_S2S_leave(void *data, struct sockaddr_in sock)
 	// remove the sending sock from the routing table
 	string ip_port = ip + ":"; 
 	ip_port = ip_port + port_str;
-    // JMP
-    cout<<channel_tables[channel][ip_port].sin_port<<endl;
-    cout<<"REMOVED SERVER "<<ip_port<<endl;
 	channel_tables[channel].erase(ip_port);
     
 	// check if this server needs to leave as well
