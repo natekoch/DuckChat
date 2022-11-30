@@ -595,22 +595,22 @@ void handle_leave_message(void *data, struct sockaddr_in sock)
 				if (channels[channel].empty() && (channel != "Common"))
 				{
 					channels.erase(channel_iter);
+			        // update the server topology
+                    if (s2s_mode) { 
+                        // check if any servers rely on this server
+		                if  (is_leaf || (channel_tables[channel]).size() == 1) 
+		                {            
+			                if (!channel_tables.empty()) 
+                            {
+                                // send a leave if not to the above
+			                    send_S2S_leave(channel_tables[channel].begin()->second, channel);
+			                }
+                            // erase the entry at channel
+			                channel_tables.erase(channel);
+		                }
+                    }
 				}
 
-			    // update the server topology
-                if (s2s_mode) { 
-                    // check if any servers rely on this server
-		            if  (is_leaf || (channel_tables[channel]).size() == 1) 
-		            {            
-			            if (!channel_tables.empty()) 
-                        {
-                            // send a leave if not to the above
-			                send_S2S_leave(channel_tables[channel].begin()->second, channel);
-			            }
-                        // erase the entry at channel
-			            channel_tables.erase(channel);
-		            }
-                }
             }
         }
 	}

@@ -8,17 +8,17 @@ SERVER=./server
 SERVER_NAME=`echo $SERVER | sed 's#.*/\(.*\)#\1#g'`
 
 # Generate a simple two-server topology
-#$SERVER localhost 4000 localhost 4001 &
-#$SERVER localhost 4001 localhost 4000 & 
+$SERVER localhost 8000 localhost 8001 &
+$SERVER localhost 8001 localhost 8000 & 
 
 # Generate a capital-H shaped topology
-$SERVER localhost 8000 localhost 8001 &
-$SERVER localhost 8001 localhost 8000 localhost 8002 localhost 8003 &
-$SERVER localhost 8002 localhost 8001 & 
-$SERVER localhost 8003 localhost 8001 localhost 8005 &
-$SERVER localhost 8004 localhost 8005 &
-$SERVER localhost 8005 localhost 8004 localhost 8003 localhost 8006 &
-$SERVER localhost 8006 localhost 8005 &
+#$SERVER localhost 8000 localhost 8001 &
+#$SERVER localhost 8001 localhost 8000 localhost 8002 localhost 8003 &
+#$SERVER localhost 8002 localhost 8001 & 
+#$SERVER localhost 8003 localhost 8001 localhost 8005 &
+#$SERVER localhost 8004 localhost 8005 &
+#$SERVER localhost 8005 localhost 8004 localhost 8003 localhost 8006 &
+#$SERVER localhost 8006 localhost 8005 &
 
 # Generate a 3x3 grid topologyg
 #$SERVER localhost 6000 localhost 6001 localhost 6003 &
