@@ -1,5 +1,5 @@
 # DuckChat
-UO CS 432: Intro to Networks - Programming Assignment 1 &amp; 2
+UO CS 432: Intro to Networks - Programming Assignments 1 &amp; 2 \
 Uses the Berkley Sockets API with UDP sockets
 
 ## v1
